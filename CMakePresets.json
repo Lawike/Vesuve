@@ -1,0 +1,32 @@
+{
+  "version": 8,
+  "configurePresets": [
+    {
+      "name": "debug-config",
+      "displayName": "Vesuve configure preset template",
+      "description": "Sets Ninja generator, build and install directory",
+      "generator": "Ninja",
+      "binaryDir": "./build-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "./install-debug",
+        "STB_DIR": "",
+        "TINY_OBJ_LOADER_DIR": ""
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug-build",
+      "configurePreset": "debug-config"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug-test",
+      "configurePreset": "debug-config",
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "error", "stopOnFailure": true}
+    }
+  ]
+}
