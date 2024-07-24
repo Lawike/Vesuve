@@ -7,9 +7,10 @@
 #include <set>
 
 //--------------------------------------------------------------------------------------------------
-PhysicalDevicePicker::PhysicalDevicePicker(std::shared_ptr<VkSurfaceKHR> surface)
+PhysicalDevicePicker::PhysicalDevicePicker(VkSurfaceKHR& surface, std::vector<const char*>& deviceExtensions)
 {
 	this->surface = surface;
+	this->deviceExtensions = deviceExtensions;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -31,7 +32,7 @@ void PhysicalDevicePicker::pick(std::vector<VkPhysicalDevice> devices) {
 bool PhysicalDevicePicker::isDeviceSuitable(VkPhysicalDevice device) {
 
 	QueueFamilyIndices indices;
-	indices.findQueueFamilies(device, *(this->surface));
+	indices.findQueueFamilies(device, this->surface);
 
 	bool extensionsSupported = checkDeviceExtensionSupport(device);
 

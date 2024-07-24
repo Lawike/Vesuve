@@ -4,21 +4,18 @@
 #endif
 
 #include <vector>
-#include <memory>
 
 class PhysicalDevicePicker {
 
 public:
 	PhysicalDevicePicker() = default;
-	PhysicalDevicePicker(std::shared_ptr<VkSurfaceKHR> surface);
+	PhysicalDevicePicker(VkSurfaceKHR& surface, std::vector<const char*>& deviceExtensions);
 	~PhysicalDevicePicker() = default;
 
-	std::shared_ptr<VkSurfaceKHR> surface;
+	VkSurfaceKHR surface = VkSurfaceKHR{};
 	VkPhysicalDevice pickedDevice = nullptr;
 	VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-	std::vector<const char*> deviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	};
+	std::vector<const char*> deviceExtensions;
 
 	void pick(std::vector<VkPhysicalDevice> devices);
 private:

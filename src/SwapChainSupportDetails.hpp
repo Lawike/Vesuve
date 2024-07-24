@@ -5,16 +5,20 @@
 #endif
 
 #include <vector>
-#include <memory>
 
 class SwapChainSupportDetails {
 public:
-	SwapChainSupportDetails(std::shared_ptr<VkSurfaceKHR> surface);
+	SwapChainSupportDetails() = default;
+	SwapChainSupportDetails(VkSurfaceKHR& surface);
+	~SwapChainSupportDetails() = default;
 
 	VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR{};
 	std::vector<VkSurfaceFormatKHR> formats;
 	std::vector<VkPresentModeKHR> presentModes;
-	std::shared_ptr<VkSurfaceKHR> surface;
+	VkSurfaceKHR surface = VkSurfaceKHR{};
 
 	void querySwapChainSupport(VkPhysicalDevice& device);
+	VkSurfaceFormatKHR chooseSwapSurfaceFormat();
+	VkPresentModeKHR chooseSwapPresentMode();
+	VkExtent2D chooseSwapExtent(GLFWwindow* window);
 };
