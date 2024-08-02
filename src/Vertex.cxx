@@ -1,6 +1,13 @@
 #include "vertex.hpp"
 
 //------------------------------------------------------------------------------------------------
+Vertex::Vertex(glm::vec3 pos, glm::vec3 color, glm::vec2 texCoord) {
+	this->pos = pos;
+	this->color = color;
+	this->texCoord = texCoord;
+}
+
+//------------------------------------------------------------------------------------------------
 VkVertexInputBindingDescription Vertex::getBindingDescription() {
 	VkVertexInputBindingDescription bindingDescription{};
 	bindingDescription.binding = 0;
@@ -33,6 +40,6 @@ std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescription
 }
 
 //------------------------------------------------------------------------------------------------
-bool Vertex::operator==(const Vertex& other) {
+bool Vertex::operator==(const Vertex& other) const {
 	return pos == other.pos && color == other.color && texCoord == other.texCoord;
 };

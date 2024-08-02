@@ -12,6 +12,10 @@ public:
 	glm::vec3 color;
 	glm::vec2 texCoord;
 
+	Vertex() = default;
+	Vertex(glm::vec3 pos, glm::vec3 color, glm::vec2 texCoord);
+	~Vertex() = default;
+
 	/**
 	* @returns the binding description object containing the corresponding stride of the Vertex data structure.
 	*/
@@ -23,5 +27,5 @@ public:
 	*/
 	static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
 	
-	bool operator==(const Vertex& other);
+	bool operator==(const Vertex& other) const;
 };
