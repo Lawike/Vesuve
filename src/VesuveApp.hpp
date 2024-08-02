@@ -1,11 +1,20 @@
 #include <vector>
 #include "Vertex.hpp"
+#include "Texture.hpp"
+
+struct UniformBufferObject {
+	alignas(16) glm::mat4 model;
+	alignas(16) glm::mat4 view;
+	alignas(16) glm::mat4 proj;
+};
 
 class VesuveApp {
 public:
 	void run();
 	VesuveApp() = default;
 	~VesuveApp() = default;
+
+	int maxFramesInFlight = 2;
 
 private:
 	GLFWwindow* window;
@@ -18,6 +27,9 @@ private:
 
 	bool enableValidationLayers;
 
+	// State
+	bool framebufferResized = false;
+
 	// Devices
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device;
@@ -28,6 +40,7 @@ private:
 	// Queues
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
+
 	// Swap chains
 	VkSwapchainKHR swapChain;
 	std::vector<VkImage> swapChainImages;
@@ -41,17 +54,22 @@ private:
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
+
+	// Anti aliasing
 	VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-	/*
+
 	// Data structures
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
+
+
+
+	// Buffers
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
 
-	// Buffers
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 	std::vector<void*> uniformBuffersMapped;
@@ -59,7 +77,6 @@ private:
 	// Descriptors
 	VkDescriptorPool descriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
-
 	VkCommandPool commandPool;
 	std::vector<VkCommandBuffer> commandBuffers;
 
@@ -67,30 +84,27 @@ private:
 	std::vector<VkSemaphore> imageAvailableSemaphores;
 	std::vector<VkSemaphore> renderFinishedSemaphores;
 	std::vector<VkFence> inFlightFences;
+
 	uint32_t currentFrame = 0;
-	*/
+
 	// texture & mipmapping
-	//uint32_t mipLevels;
-	//VkImage textureImage;
-	//VkDeviceMemory textureImageMemory;
-	// VkImageView textureImageView;
-	/*
+	uint32_t mipLevels;
+	VkImage textureImage;
+	VkDeviceMemory textureImageMemory;
+	VkImageView textureImageView;
 	VkSampler textureSampler;
-	VkImage depthImage;
-	VkDeviceMemory depthImageMemory;
-	VkImageView depthImageView;
-	*/
-	bool framebufferResized = false;
-	/*
-	// Anti aliasing
-	VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
 	// Display image
 	VkImage colorImage;
 	VkDeviceMemory colorImageMemory;
 	VkImageView colorImageView;
-	*/
-	//Support
+
+	// Depth image
+	VkImage depthImage;
+	VkDeviceMemory depthImageMemory;
+	VkImageView depthImageView;
+
+	//Validation layer support
 	bool checkValidationLayerSupport();
 	std::vector<const char*> getRequiredExtensions();
 
@@ -113,6 +127,7 @@ private:
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 	void createDescriptorSetLayout();
 	void createGraphicsPipeline();
+	VkShaderModule createShaderModule(const std::vector<char>& code);
 	void createCommandPool();
 	void createColorResources();
 	void createDepthResources();
@@ -121,6 +136,8 @@ private:
 	void createTextureSampler();
 	void createFramebuffers();
 	void loadModel();
+	template <typename bufferType>
+	void createBuffer(std::vector<bufferType>& bufferData, VkBuffer& buffer, VkDeviceMemory& memory, VkBufferUsageFlags usage);
 	void createVertexBuffer();
 	void createIndexBuffer();
 	void createUniformBuffers();
@@ -132,4 +149,9 @@ private:
 
 	void cleanup();
 	void cleanupSwapChain();
+
+	void drawFrame();
+	void recreateSwapChain();
+	void updateUniformBuffer(uint32_t currentFrame);
+	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 };

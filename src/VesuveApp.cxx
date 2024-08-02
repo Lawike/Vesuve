@@ -1,17 +1,79 @@
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+#ifndef GLM_FORCE_RADIANS
+#define GLM_FORCE_RADIANS
+#endif // !GLM_FORCE_RADIANS
+
+#ifndef GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#endif // !GLM_FORCE_DEPTH_ZERO_TO_ONE
+
+#ifndef TINYOBJLOADER_IMPLEMENTATION
+#define TINYOBJLOADER_IMPLEMENTATION
+#endif // !TINYOBJLOADER_IMPLEMENTATION
+
 #ifndef GLM_ENABLE_EXPERIMENTAL
 #define GLM_ENABLE_EXPERIMENTAL
 #endif // !GLM_ENABLE_EXPERIMENTAL
+
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#endif // !STB_IMAGE_IMPLEMENTATION
+
+
 #include <glm/gtx/hash.hpp>
 
-#include <chrono>
-#include <vector>
-#include <set>
+#ifndef STB_IMAGE_H
+#define STB_IMAGE_H
+#include "stb_image.h"
+#endif // !STB_IMAGE_H
 
+#ifndef GLM_H
+#define GLM_H
+#include <glm/glm.hpp>
+#endif // !#define GLM_H
+
+
+
+#include <tiny_obj_loader.h>
+
+
+#include "Buffer.hpp"
 #include "VesuveApp.hpp"
 #include "DebugUtils.hpp"
 #include "PhysicalDevicePicker.hpp"
 #include "QueueFamilyIndices.hpp"
 #include "SwapChainSupportDetails.hpp"
+#include "MemoryTypeFinder.hpp"
+
+#include <chrono>
+#include <vector>
+#include <set>
+#include <vector>;
+#include <string>;
+#include <iostream>;
+#include <fstream>;
+#include <ios>;
+
+
+namespace FileSystem {
+	std::vector<char> readFile(const std::string& filename) {
+		std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+		if (!file.is_open()) {
+			throw std::runtime_error("failed to open file !");
+		}
+
+		size_t fileSize = (size_t)file.tellg();
+		std::vector<char> buffer(fileSize);
+		file.seekg(0);
+		file.read(buffer.data(), fileSize);
+
+		file.close();
+		return buffer;
+	}
+}
 
 namespace std {
 	template<> struct hash<Vertex> {
@@ -26,6 +88,9 @@ namespace std {
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
+
+const std::string texture_path = "F:/Projets/Vulkan_tutorial/Vulkan_tutorial/Assets/viking_room.png";
+const std::string MODEL_PATH = "F:/Projets/Vulkan_tutorial/Vulkan_tutorial/Assets/viking_room.obj";
 
 //--------------------------------------------------------------------------------------------------
 void VesuveApp::run()
@@ -116,13 +181,30 @@ void VesuveApp::initVulkan() {
 	this->createSwapChain();
 	this->createImageViews();
 	this->createRenderPass();
+	this->createDescriptorSetLayout();
+	this->createGraphicsPipeline();
+	this->createCommandPool();
+	this->createColorResources();
+	this->createDepthResources();
+	this->createTextureImage();
+	this->createTextureImageView();
+	this->createTextureSampler();
+	this->createFramebuffers();
+	this->loadModel();
+	this->createVertexBuffer();
+	this->createIndexBuffer();
+	this->createUniformBuffers();
+	this->createDescriptorPool();
+	this->createDescriptorSets();
+	this->createCommandBuffers();
+	this->createSyncObjects();
 }
 
 //--------------------------------------------------------------------------------------------------
 void VesuveApp::mainLoop() {
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		//drawFrame();
+		drawFrame();
 	}
 
 	vkDeviceWaitIdle(device);
@@ -133,12 +215,37 @@ void VesuveApp::cleanup()
 {
 	this->cleanupSwapChain();
 
-	//vkDestroyImageView(device, textureImageView, nullptr);
+	vkDestroySampler(device, textureSampler, nullptr);
+	vkDestroyImageView(device, textureImageView, nullptr);
 
-	//vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-	//vkDestroyPipeline(device, graphicsPipeline, nullptr);
-	//vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+	vkDestroyImage(device, textureImage, nullptr);
+	vkFreeMemory(device, textureImageMemory, nullptr);
+
+	for (int i = 0; i < maxFramesInFlight; i++) {
+		vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+		vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+	}
+	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+
+	vkDestroyPipeline(device, graphicsPipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+
 	vkDestroyRenderPass(device, renderPass, nullptr);
+
+	vkDestroyBuffer(device, indexBuffer, nullptr);
+	vkFreeMemory(device, indexBufferMemory, nullptr);
+
+	vkDestroyBuffer(device, vertexBuffer, nullptr);
+	vkFreeMemory(device, vertexBufferMemory, nullptr);
+
+	for (size_t i = 0; i < maxFramesInFlight; i++) {
+		vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+		vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+		vkDestroyFence(device, inFlightFences[i], nullptr);
+	}
+
+	vkDestroyCommandPool(device, commandPool, nullptr);
 
 	vkDestroyDevice(device, nullptr);
 
@@ -156,7 +263,7 @@ void VesuveApp::cleanup()
 
 //--------------------------------------------------------------------------------------------------
 void VesuveApp::cleanupSwapChain() {
-	/*
+
 	vkDestroyImageView(device, colorImageView, nullptr);
 	vkDestroyImage(device, colorImage, nullptr);
 	vkFreeMemory(device, colorImageMemory, nullptr);
@@ -167,11 +274,182 @@ void VesuveApp::cleanupSwapChain() {
 
 	for (auto framebuffer : swapChainFramebuffers) {
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
-	}*/
+	}
+
 	for (auto imageView : swapChainImageViews) {
 		vkDestroyImageView(device, imageView, nullptr);
 	}
 	vkDestroySwapchainKHR(device, swapChain, nullptr);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::drawFrame() {
+	vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+
+	uint32_t imageIndex;
+	VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		recreateSwapChain();
+		return;
+	}
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		throw std::runtime_error("failed to acquire swap chain image!");
+	}
+
+	updateUniformBuffer(currentFrame);
+
+	vkResetFences(device, 1, &inFlightFences[currentFrame]);
+
+	vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
+	recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.pWaitDstStageMask = waitStages;
+
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+
+	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
+
+	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
+		throw std::runtime_error("failed to submit draw command buffer!");
+	}
+
+	VkPresentInfoKHR presentInfo{};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = signalSemaphores;
+
+	VkSwapchainKHR swapChains[] = { swapChain };
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = swapChains;
+
+	presentInfo.pImageIndices = &imageIndex;
+
+	result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+		framebufferResized = false;
+		recreateSwapChain();
+	}
+	else if (result != VK_SUCCESS) {
+		throw std::runtime_error("failed to present swap chain image!");
+	}
+
+	currentFrame = (currentFrame + 1) % maxFramesInFlight;
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::recreateSwapChain() {
+	int width = 0, height = 0;
+	glfwGetFramebufferSize(window, &width, &height);
+	while (width == 0 || height == 0) {
+		glfwGetFramebufferSize(window, &width, &height);
+		glfwWaitEvents();
+	}
+
+	vkDeviceWaitIdle(device);
+
+	cleanupSwapChain();
+	createSwapChain();
+	createImageViews();
+	createColorResources();
+	createDepthResources();
+	createFramebuffers();
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::updateUniformBuffer(uint32_t currentImage) {
+	static auto startTime = std::chrono::high_resolution_clock::now();
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+	UniformBufferObject ubo{};
+	ubo.model = glm::rotate(
+		glm::mat4(1.0f),            // Identity matrix
+		time * glm::radians(90.0f), // Angle
+		glm::vec3(0.0f, 0.0f, 1.0f) // Rotation Axis
+	);
+	ubo.view = glm::lookAt(
+		glm::vec3(2.0f, 2.0f, 2.0f), // eye position
+		glm::vec3(0.0f, 0.0f, 0.0f), // center position
+		glm::vec3(0.0f, 0.0f, 1.0f)  // up axis
+	);
+	ubo.proj = glm::perspective(
+		glm::radians(45.0f),                                    // 45 deg vertical FOV
+		swapChainExtent.width / (float)swapChainExtent.height,  // aspect ratio
+		0.1f,                                                   // near view plane
+		10.0f                                                   // far view plane
+	);
+	ubo.proj[1][1] *= -1; // Because of OpenGL shenanigans
+
+	memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+		throw std::runtime_error("failed to begin recording command buffer!");
+	}
+
+	VkRenderPassBeginInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = renderPass;
+	renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = swapChainExtent;
+
+	std::array<VkClearValue, 2> clearValues{};
+	clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+	clearValues[1].depthStencil = { 1.0f, 0 };		renderPassInfo.clearValueCount = 1;
+	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues = clearValues.data();
+
+	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)swapChainExtent.width;
+	viewport.height = (float)swapChainExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = swapChainExtent;
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+	VkBuffer vertexBuffers[] = { vertexBuffer };
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+	vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+	vkCmdEndRenderPass(commandBuffer);
+
+	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+		throw std::runtime_error("failed to record command buffer!");
+	}
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -478,4 +756,521 @@ VkFormat VesuveApp::findSupportedFormat(const std::vector<VkFormat>& candidates,
 		}
 	}
 	throw std::runtime_error("failed to find supported format!");
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createDescriptorSetLayout() {
+	VkDescriptorSetLayoutBinding uboLayoutBinding{};
+	uboLayoutBinding.binding = 0;
+	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uboLayoutBinding.descriptorCount = 1;
+	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	uboLayoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+	samplerLayoutBinding.binding = 1;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	samplerLayoutBinding.pImmutableSamplers = nullptr;
+
+	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+	VkDescriptorSetLayoutCreateInfo layoutInfo{};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
+
+	if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create descriptor set layout !");
+	}
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createGraphicsPipeline() {
+	auto vertShaderCode = FileSystem::readFile("shaders/shader.vert.spv");
+	auto fragShaderCode = FileSystem::readFile("shaders/shader.frag.spv");
+
+	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertShaderModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+	auto bindingDescription = Vertex::getBindingDescription();
+	auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+	VkPipelineViewportStateCreateInfo viewportState{};
+	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = 1;
+	viewportState.scissorCount = 1;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer{};
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.depthClampEnable = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // Because of glm/openGL shenanigans
+	rasterizer.depthBiasEnable = VK_FALSE;
+
+	VkPipelineMultisampleStateCreateInfo multisampling{};
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.rasterizationSamples = msaaSamples;
+	multisampling.sampleShadingEnable = VK_TRUE;
+	multisampling.minSampleShading = .2f;
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_FALSE;
+
+	VkPipelineColorBlendStateCreateInfo colorBlending{};
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.logicOpEnable = VK_FALSE;
+	colorBlending.logicOp = VK_LOGIC_OP_COPY;
+	colorBlending.attachmentCount = 1;
+	colorBlending.pAttachments = &colorBlendAttachment;
+	colorBlending.blendConstants[0] = 0.0f;
+	colorBlending.blendConstants[1] = 0.0f;
+	colorBlending.blendConstants[2] = 0.0f;
+	colorBlending.blendConstants[3] = 0.0f;
+
+	std::vector<VkDynamicState> dynamicStates = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	};
+	VkPipelineDynamicStateCreateInfo dynamicState{};
+	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+	dynamicState.pDynamicStates = dynamicStates.data();
+
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+
+	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create pipeline layout!");
+	}
+
+	VkPipelineDepthStencilStateCreateInfo depthStencil{};
+	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStencil.depthTestEnable = VK_TRUE;
+	depthStencil.depthWriteEnable = VK_TRUE;
+	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+	depthStencil.depthBoundsTestEnable = VK_FALSE;
+	depthStencil.stencilTestEnable = VK_FALSE;
+
+	VkGraphicsPipelineCreateInfo pipelineInfo{};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.stageCount = 2;
+	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pMultisampleState = &multisampling;
+	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pDynamicState = &dynamicState;
+	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.renderPass = renderPass;
+	pipelineInfo.subpass = 0;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.pDepthStencilState = &depthStencil;
+
+	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create graphics pipeline!");
+	}
+
+	vkDestroyShaderModule(device, fragShaderModule, nullptr);
+	vkDestroyShaderModule(device, vertShaderModule, nullptr);
+}
+
+//--------------------------------------------------------------------------------------------------
+VkShaderModule VesuveApp::createShaderModule(const std::vector<char>& code)
+{
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = code.size();
+	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+	VkShaderModule shaderModule;
+	if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create shader module!");
+	}
+
+	return shaderModule;
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createCommandPool() {
+	QueueFamilyIndices indices{};
+	indices.findQueueFamilies(physicalDevice, surface);
+	uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+
+	VkCommandPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	poolInfo.queueFamilyIndex = indices.graphicsFamily.value();
+
+	if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create command pool!");
+	}
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createColorResources() {
+	VkFormat colorFormat = swapChainImageFormat;
+	VesuveImage vesuveColorImage {
+		physicalDevice,
+		device,
+		swapChainExtent.width,
+		swapChainExtent.height,
+		1,
+		msaaSamples,
+		colorFormat,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+	};
+	colorImage = vesuveColorImage.image;
+	colorImageMemory = vesuveColorImage.imageMemory;
+	colorImageView = createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createDepthResources() {
+	VkFormat depthFormat = findDepthFormat();
+	VesuveImage vesuveDepthImage{
+		physicalDevice,
+		device,
+		swapChainExtent.width,
+		swapChainExtent.height,
+		1,
+		msaaSamples,
+		depthFormat,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	};
+	depthImage = vesuveDepthImage.image;
+	depthImageMemory = vesuveDepthImage.imageMemory;
+	depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createTextureImage() {
+	int width, height, channels;
+	stbi_uc* pixels = stbi_load(
+		texture_path.c_str(),
+		&width,
+		&height,
+		&channels,
+		STBI_rgb_alpha
+	);
+	mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
+	if (!pixels) {
+		throw std::runtime_error("failed to load texture image !");
+	}
+	Texture texture { physicalDevice, device, width, height, channels, pixels, commandPool, graphicsQueue };
+	textureImage = texture.textureImage.image;
+	textureImageMemory = texture.textureImage.imageMemory;
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createTextureImageView() {
+	textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createTextureSampler() {
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.anisotropyEnable = VK_TRUE;
+
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.minLod = 0.0f;
+	samplerInfo.maxLod = static_cast<float>(mipLevels);
+
+	if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create texture sampler!");
+	}
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createFramebuffers() {
+	swapChainFramebuffers.resize(swapChainImageViews.size());
+
+	for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+		std::array<VkImageView, 3> attachments = {
+			colorImageView,
+			depthImageView,
+			swapChainImageViews[i]
+		};
+
+		VkFramebufferCreateInfo framebufferInfo{};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = renderPass;
+		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+		framebufferInfo.pAttachments = attachments.data();
+		framebufferInfo.width = swapChainExtent.width;
+		framebufferInfo.height = swapChainExtent.height;
+		framebufferInfo.layers = 1;
+
+		if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create framebuffer!");
+		}
+	}
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::loadModel() {
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string warn, err;
+
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
+		throw std::runtime_error(warn + err);
+	}
+
+	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+	for (const auto& shape : shapes) {
+		for (const auto& index : shape.mesh.indices) {
+			Vertex vertex{};
+
+			vertex.pos = {
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
+			};
+
+			vertex.texCoord = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+			vertex.color = { 1.0f, 1.0f, 1.0f };
+
+			if (uniqueVertices.count(vertex) == 0) {
+				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+				vertices.push_back(vertex);
+			}
+
+			indices.push_back(uniqueVertices[vertex]);
+		}
+	}
+	std::cout << "vertex size :" << vertices.size();
+}
+template <typename bufferType>
+void VesuveApp::createBuffer(std::vector<bufferType>& bufferData, VkBuffer& buffer, VkDeviceMemory& memory, VkBufferUsageFlags usage) {
+	VkDeviceSize bufferSize = sizeof(bufferData[0]) * bufferData.size();
+
+	Buffer stagingBufferWrapper{
+		physicalDevice,
+		device,
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	};
+
+	void* data;
+	vkMapMemory(device, stagingBufferWrapper.memory, 0, bufferSize, 0, &data);
+	memcpy(data, bufferData.data(), (size_t)bufferSize);
+	vkUnmapMemory(device, stagingBufferWrapper.memory);
+
+	Buffer bufferWrapper{
+		physicalDevice,
+		device,
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	};
+
+	bufferWrapper.copy(stagingBufferWrapper, bufferSize, device, commandPool, graphicsQueue);
+	buffer = bufferWrapper.refBuffer;
+	memory = bufferWrapper.memory;
+
+	vkDestroyBuffer(device, stagingBufferWrapper.refBuffer, nullptr);
+	vkFreeMemory(device, stagingBufferWrapper.memory, nullptr);
+
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createVertexBuffer() {
+	this->createBuffer(vertices, vertexBuffer, vertexBufferMemory, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createIndexBuffer() {
+	createBuffer(indices, indexBuffer, indexBufferMemory, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createUniformBuffers() {
+	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+	uniformBuffers.resize(maxFramesInFlight);
+	uniformBuffersMemory.resize(maxFramesInFlight);
+	uniformBuffersMapped.resize(maxFramesInFlight);
+
+	for (size_t i = 0; i < maxFramesInFlight; i++) {
+		Buffer uniformBufferWrapper{
+			physicalDevice,
+			device,
+			bufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+		};
+		uniformBuffers[i] = uniformBufferWrapper.refBuffer;
+		uniformBuffersMemory[i] = uniformBufferWrapper.memory;
+		vkMapMemory(
+			device,
+			uniformBuffersMemory[i],
+			0,
+			bufferSize,
+			0,
+			&uniformBuffersMapped[i]
+		);
+	}
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createDescriptorPool() {
+	std::array<VkDescriptorPoolSize, 2> poolSizes{};
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[0].descriptorCount = static_cast<uint32_t>(maxFramesInFlight);
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[1].descriptorCount = static_cast<uint32_t>(maxFramesInFlight);
+
+	VkDescriptorPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	poolInfo.pPoolSizes = poolSizes.data();
+	poolInfo.maxSets = static_cast<uint32_t>(maxFramesInFlight);
+
+	if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create descriptor pool !");
+	}
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createDescriptorSets() {
+	std::vector<VkDescriptorSetLayout> layouts(maxFramesInFlight, descriptorSetLayout);
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(maxFramesInFlight);
+	allocInfo.pSetLayouts = layouts.data();
+
+	descriptorSets.resize(maxFramesInFlight);
+	if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate descriptor sets !");
+	}
+
+	for (size_t i = 0; i < maxFramesInFlight; i++) {
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = uniformBuffers[i];
+		bufferInfo.offset = 0;
+		bufferInfo.range = sizeof(UniformBufferObject);
+
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		imageInfo.imageView = textureImageView;
+		imageInfo.sampler = textureSampler;
+
+		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[0].dstSet = descriptorSets[i];
+		descriptorWrites[0].dstBinding = 0;
+		descriptorWrites[0].dstArrayElement = 0;
+		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[0].descriptorCount = 1;
+		descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[1].dstSet = descriptorSets[i];
+		descriptorWrites[1].dstBinding = 1;
+		descriptorWrites[1].dstArrayElement = 0;
+		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[1].descriptorCount = 1;
+		descriptorWrites[1].pImageInfo = &imageInfo;
+
+		vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+	}
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createCommandBuffers() {
+	commandBuffers.resize(maxFramesInFlight);
+
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = commandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+
+	if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate command buffers!");
+	}
+}
+
+//--------------------------------------------------------------------------------------------------
+void VesuveApp::createSyncObjects() {
+	imageAvailableSemaphores.resize(maxFramesInFlight);
+	renderFinishedSemaphores.resize(maxFramesInFlight);
+	inFlightFences.resize(maxFramesInFlight);
+
+	VkSemaphoreCreateInfo semaphoreInfo{};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	for (size_t i = 0; i < maxFramesInFlight; i++) {
+		if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+			vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create synchronization objects for a frame!");
+		}
+	}
 }
