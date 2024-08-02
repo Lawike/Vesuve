@@ -9,7 +9,10 @@
       "binaryDir": "./build-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_INSTALL_PREFIX": "./install-debug",
+        "CMAKE_INSTALL_PREFIX": "./install-debug"
+      },
+      "environment": {
+        "VULKAN_SDK": "",
         "STB_DIR": "",
         "TINY_OBJ_LOADER_DIR": ""
       }
