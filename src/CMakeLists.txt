@@ -23,7 +23,9 @@ add_executable(
     "VesuveImage.cxx"
     "SingleTimeCommand.hpp"
     "SingleTimeCommand.cxx"
-  )
+    "UniformBufferObject.hpp"
+    "VkTypes.hpp"
+  "VkInitializers.cxx" "VkInitializers.hpp"    "VkEngine.cxx" "VkEngine.hpp")
 
 if(NOT DEFINED ENV{STB_DIR})
     message(FATAL_ERROR "La variable d'environnement STB_DIR n'est pas définie.")
@@ -38,6 +40,7 @@ target_link_libraries(Vesuve PRIVATE
 	glm::glm
 	Vulkan::Vulkan
 	glfw
+    fmt::fmt
 )
 
 # Custom target for shaders compilation

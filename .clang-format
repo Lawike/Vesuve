@@ -1,0 +1,35 @@
+# Format Style Options - Created with Clang Power Tools
+---
+BasedOnStyle: Google
+AlignAfterOpenBracket: 'AlwaysBreak'
+AlignTrailingComments: true
+AllowAllConstructorInitializersOnNextLine: 'false'
+AllowAllParametersOfDeclarationOnNextLine: 'false'
+AlignConsecutiveMacros: 'true'
+AllowShortCaseLabelsOnASingleLine: 'true'
+AllowShortFunctionsOnASingleLine: 'None'
+AllowShortIfStatementsOnASingleLine: 'Never'
+AllowShortLoopsOnASingleLine: 'false'
+BreakBeforeBraces: Allman
+BinPackArguments: 'false'
+BinPackParameters: 'false'
+AlwaysBreakTemplateDeclarations: No
+BreakBeforeBinaryOperators: None
+ColumnLimit: 125
+ContinuationIndentWidth: 2
+Cpp11BracedListStyle: true
+EmptyLineBeforeAccessModifier: Leave
+IncludeBlocks: Merge
+IndentWidth: 2
+MaxEmptyLinesToKeep: 2
+NamespaceIndentation: All
+ReflowComments: false
+SortIncludes: true
+SpaceAfterTemplateKeyword: 'false'
+SpaceBeforeCtorInitializerColon: 'true'
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeRangeBasedForLoopColon: 'true'
+UseTab: ForIndentation
+SpaceInEmptyBlock: true
+Standard: 'Latest'
+...

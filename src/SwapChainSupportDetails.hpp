@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 #ifndef GLFW_INCLUDE_VULKAN
 #define GLFW_INCLUDE_VULKAN
@@ -6,19 +8,20 @@
 
 #include <vector>
 
-class SwapChainSupportDetails {
-public:
-	SwapChainSupportDetails() = default;
-	SwapChainSupportDetails(VkSurfaceKHR& surface);
-	~SwapChainSupportDetails() = default;
+class SwapChainSupportDetails
+{
+ public:
+  SwapChainSupportDetails() = default;
+  SwapChainSupportDetails(VkSurfaceKHR& surface);
+  ~SwapChainSupportDetails() = default;
 
-	VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR{};
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> presentModes;
-	VkSurfaceKHR surface = VkSurfaceKHR{};
+  VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR{};
+  std::vector<VkSurfaceFormatKHR> formats;
+  std::vector<VkPresentModeKHR> presentModes;
+  VkSurfaceKHR surface = VkSurfaceKHR{};
 
-	void querySwapChainSupport(VkPhysicalDevice& device);
-	VkSurfaceFormatKHR chooseSwapSurfaceFormat();
-	VkPresentModeKHR chooseSwapPresentMode();
-	VkExtent2D chooseSwapExtent(GLFWwindow* window);
+  void querySwapChainSupport(VkPhysicalDevice& device);
+  VkSurfaceFormatKHR chooseSwapSurfaceFormat();
+  VkPresentModeKHR chooseSwapPresentMode();
+  VkExtent2D chooseSwapExtent(GLFWwindow* window);
 };

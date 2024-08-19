@@ -1,39 +1,42 @@
 #include "SingleTimeCommand.hpp"
 
 //--------------------------------------------------------------------------------------------------
-SingleTimeCommand::SingleTimeCommand(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue) {
-	this->device = device;
-	this->commandPool = commandPool;
-	this->graphicsQueue = graphicsQueue;
+SingleTimeCommand::SingleTimeCommand(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue)
+{
+  this->device = device;
+  this->commandPool = commandPool;
+  this->graphicsQueue = graphicsQueue;
 }
 
 //--------------------------------------------------------------------------------------------------
-void SingleTimeCommand::begin() {
-	VkCommandBufferAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandPool = commandPool;
-	allocInfo.commandBufferCount = 1;
+void SingleTimeCommand::begin()
+{
+  VkCommandBufferAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = commandPool;
+  allocInfo.commandBufferCount = 1;
 
-	vkAllocateCommandBuffers(device, &allocInfo, &buffer);
+  vkAllocateCommandBuffers(device, &allocInfo, &buffer);
 
-	VkCommandBufferBeginInfo beginInfo{};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  VkCommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-	vkBeginCommandBuffer(buffer, &beginInfo);
+  vkBeginCommandBuffer(buffer, &beginInfo);
 }
 
-void SingleTimeCommand::end() {
-	vkEndCommandBuffer(buffer);
+void SingleTimeCommand::end()
+{
+  vkEndCommandBuffer(buffer);
 
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &buffer;
+  VkSubmitInfo submitInfo{};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &buffer;
 
-	vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(graphicsQueue);
+  vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(graphicsQueue);
 
-	vkFreeCommandBuffers(device, commandPool, 1, &buffer);
+  vkFreeCommandBuffers(device, commandPool, 1, &buffer);
 }
