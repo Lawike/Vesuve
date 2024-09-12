@@ -60,7 +60,7 @@ VkPresentModeKHR SwapChainSupportDetails::chooseSwapPresentMode()
 }
 
 //--------------------------------------------------------------------------------------------------
-VkExtent2D SwapChainSupportDetails::chooseSwapExtent(GLFWwindow* window)
+VkExtent2D SwapChainSupportDetails::chooseSwapExtent(SDL_Window* window)
 {
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
   {
@@ -69,7 +69,7 @@ VkExtent2D SwapChainSupportDetails::chooseSwapExtent(GLFWwindow* window)
   else
   {
     int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
+    SDL_GetWindowSize(window, &width, &height);
 
     VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 

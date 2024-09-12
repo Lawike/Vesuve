@@ -1,10 +1,8 @@
 add_executable(
     Vesuve 
     "main.cxx"
-    "VesuveApp.hpp"
-    "VesuveApp.cxx"
-    "Vertex.cxx"
-    "Vertex.hpp"
+    "VkEngine.cxx"
+    "VkEngine.hpp"
     "DebugUtils.hpp"
     "DebugUtils.cxx"
     "PhysicalDevicePicker.hpp"
@@ -13,19 +11,29 @@ add_executable(
     "SwapChainSupportDetails.cxx"
     "QueueFamilyIndices.hpp"
     "QueueFamilyIndices.cxx"
-    "Texture.hpp"
-    "Texture.cxx"
     "Buffer.hpp"
     "Buffer.cxx"
     "MemoryTypeFinder.hpp"
-    "MemoryTypeFinder.cxx"
-    "VesuveImage.hpp"
-    "VesuveImage.cxx"
+    "MemoryTypeFinder.cxx"    
     "SingleTimeCommand.hpp"
     "SingleTimeCommand.cxx"
     "UniformBufferObject.hpp"
     "VkTypes.hpp"
-  "VkInitializers.cxx" "VkInitializers.hpp"    "VkEngine.cxx" "VkEngine.hpp")
+    "VkInitializers.cxx"
+    "VkInitializers.hpp"
+    "VkImages.cxx"
+    "VkImages.hpp"
+    "VkDescriptors.cxx"
+    "VkDescriptors.hpp"
+    "VkPipelines.cxx"
+    "VkPipelines.hpp"
+    "VkLoader.hpp"
+    "VkLoader.cxx"
+    "Camera.cxx"
+    "Camera.hpp"
+)
+
+target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 if(NOT DEFINED ENV{STB_DIR})
     message(FATAL_ERROR "La variable d'environnement STB_DIR n'est pas définie.")
@@ -39,8 +47,12 @@ target_include_directories(Vesuve PRIVATE $ENV{TINY_OBJ_LOADER_DIR})
 target_link_libraries(Vesuve PRIVATE 
 	glm::glm
 	Vulkan::Vulkan
-	glfw
     fmt::fmt
+    vk-bootstrap::vk-bootstrap
+    imgui::imgui
+    imgui::imgui_impl_vulkan
+    imgui::imgui_impl_sdl2
+    fastgltf::fastgltf
 )
 
 # Custom target for shaders compilation
@@ -48,6 +60,7 @@ set(GLSL_VALIDATOR "$ENV{VULKAN_SDK}/Bin/glslangValidator.exe")
 file(GLOB_RECURSE GLSL_SOURCE_FILES
     "*.frag"
     "*.vert"
+    "*.comp"
 )
 
 foreach(GLSL ${GLSL_SOURCE_FILES})
@@ -62,7 +75,7 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
 endforeach(GLSL)
 
 add_custom_target(
-    Shaders 
+    Shaders
     DEPENDS ${SPIRV_BINARY_FILES}
 )
 add_dependencies(Vesuve Shaders)

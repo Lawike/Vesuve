@@ -1,12 +1,12 @@
 #pragma once
 
 #include <vector>
-#ifndef GLFW_INCLUDE_VULKAN
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#ifndef SDL_H
+#define SDL_H
+#include "SDL2/SDL.h"
+#include "SDL2/SDL_vulkan.h"
 #endif
-
-#include <vector>
+#include "VkTypes.hpp"
 
 class SwapChainSupportDetails
 {
@@ -23,5 +23,5 @@ class SwapChainSupportDetails
   void querySwapChainSupport(VkPhysicalDevice& device);
   VkSurfaceFormatKHR chooseSwapSurfaceFormat();
   VkPresentModeKHR chooseSwapPresentMode();
-  VkExtent2D chooseSwapExtent(GLFWwindow* window);
+  VkExtent2D chooseSwapExtent(SDL_Window* window);
 };

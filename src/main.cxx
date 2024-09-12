@@ -1,10 +1,19 @@
-#include <iostream>
-#include "VesuveApp.hpp"
+// #include "VesuveApp.hpp"
+#include "VkEngine.hpp"
 
 
 int main()
 {
-  VesuveApp app;
+  VkEngine renderEngine;
+
+  renderEngine.init();
+
+  renderEngine.run();
+
+  renderEngine.cleanup();
+
+  return 0;
+  /*VesuveApp app;
 
   try
   {
@@ -17,4 +26,5 @@ int main()
   }
 
   return EXIT_SUCCESS;
+  */
 }

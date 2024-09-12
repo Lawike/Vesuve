@@ -3,7 +3,7 @@
 #include "VkTypes.hpp"
 
 /*
- * Abstrations for Vulkan structures initilization.
+ * Abstractions for Vulkan structures initilization.
  */
 namespace vkinit
 {

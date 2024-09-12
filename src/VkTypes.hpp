@@ -1,9 +1,7 @@
 #pragma once
-#define VMA_IMPLEMENTATION
 #include <fmt/core.h>
 #include <vma/vk_mem_alloc.h>
 #include <vulkan/vk_enum_string_helper.h>
-#include <vulkan/vulkan.h>
 #include <array>
 #include <deque>
 #include <functional>
@@ -14,8 +12,15 @@
 #include <span>
 #include <string>
 #include <vector>
-#include "Vertex.hpp"
 
+struct Vertex
+{
+  glm::vec3 position;
+  float uv_x;
+  glm::vec3 normal;
+  float uv_y;
+  glm::vec4 color;
+};
 
 struct AllocatedImage
 {
