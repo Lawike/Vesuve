@@ -19,4 +19,7 @@ class Camera
   void processSDLEvent(SDL_Event& e);
 
   void update();
+
+ private:
+  bool _mousePressed = false;
 };

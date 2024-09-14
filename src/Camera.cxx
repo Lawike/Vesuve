@@ -72,10 +72,23 @@ void Camera::processSDLEvent(SDL_Event& e)
     }
   }
 
-  if (e.type == SDL_MOUSEMOTION)
+  // for right click only
+  if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT)
   {
-    yaw += (float)e.motion.xrel / 200.f;
-    pitch -= (float)e.motion.yrel / 200.f;
+    _mousePressed = true;
+  }
+  if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT)
+  {
+    _mousePressed = false;
+  }
+
+  if (_mousePressed)
+  {
+    if (e.type == SDL_MOUSEMOTION)
+    {
+      yaw += (float)e.motion.xrel / 200.f;
+      pitch -= (float)e.motion.yrel / 200.f;
+    }
   }
 }
 
