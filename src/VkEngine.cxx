@@ -252,7 +252,7 @@ void VkEngine::draw()
   VkSubmitInfo2 submit = vkinit::submitInfo(&cmdinfo, &signalInfo, &waitInfo);
 
   //submit command buffer to the queue and execute it.
-  // _renderFence will now block until the graphic commands finish execution
+  // _renderFence will now block until the graphic commands finish execdution
   VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, this->getCurrentFrame()._renderFence));
 
 
@@ -383,28 +383,28 @@ void VkEngine::drawGeometry(VkCommandBuffer cmd)
       //rebind pipeline and descriptors if the material changed
       if (r.material->pipeline != lastPipeline)
       {
-	lastPipeline = r.material->pipeline;
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->pipeline);
-	vkCmdBindDescriptorSets(
-	  cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
+        lastPipeline = r.material->pipeline;
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->pipeline);
+        vkCmdBindDescriptorSets(
+          cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
 
-	VkViewport viewport = {};
-	viewport.x = 0;
-	viewport.y = 0;
-	viewport.width = (float)_windowExtent.width;
-	viewport.height = (float)_windowExtent.height;
-	viewport.minDepth = 0.f;
-	viewport.maxDepth = 1.f;
+        VkViewport viewport = {};
+        viewport.x = 0;
+        viewport.y = 0;
+        viewport.width = (float)_windowExtent.width;
+        viewport.height = (float)_windowExtent.height;
+        viewport.minDepth = 0.f;
+        viewport.maxDepth = 1.f;
 
-	vkCmdSetViewport(cmd, 0, 1, &viewport);
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
 
-	VkRect2D scissor = {};
-	scissor.offset.x = 0;
-	scissor.offset.y = 0;
-	scissor.extent.width = _windowExtent.width;
-	scissor.extent.height = _windowExtent.height;
+        VkRect2D scissor = {};
+        scissor.offset.x = 0;
+        scissor.offset.y = 0;
+        scissor.extent.width = _windowExtent.width;
+        scissor.extent.height = _windowExtent.height;
 
-	vkCmdSetScissor(cmd, 0, 1, &scissor);
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
       }
 
       vkCmdBindDescriptorSets(
@@ -565,9 +565,15 @@ void VkEngine::updateScene()
   _sceneData.sunlightColor = glm::vec4(1.f);
   _sceneData.sunlightDirection = glm::vec4(0, 1, 0.5, 1.f);
 
-  //_loadedNodes["Suzanne"]->Draw(glm::mat4{1.f}, _mainDrawContext);
+  if (!_selectedNodeName.empty())
+  {
+    _loadedNodes[_selectedNodeName]->Draw(glm::mat4{1.f}, _mainDrawContext);
+  }
 
-  _loadedScenes["structure"]->Draw(glm::mat4{1.f}, _mainDrawContext);
+  if (!_selectedSceneName.empty())
+  {
+    _loadedScenes[_selectedSceneName]->Draw(glm::mat4{1.f}, _mainDrawContext);
+  }
 
   auto end = std::chrono::system_clock::now();
 
@@ -593,21 +599,21 @@ void VkEngine::run()
     {
       //close the window when user alt-f4s or clicks the X button
       if (e.type == SDL_QUIT)
-	bQuit = true;
+        bQuit = true;
 
       _mainCamera.processSDLEvent(e);
       ImGui_ImplSDL2_ProcessEvent(&e);
 
       if (e.type == SDL_WINDOWEVENT)
       {
-	if (e.window.event == SDL_WINDOWEVENT_MINIMIZED)
-	{
-	  _stopRendering = true;
-	}
-	if (e.window.event == SDL_WINDOWEVENT_RESTORED)
-	{
-	  _stopRendering = false;
-	}
+        if (e.window.event == SDL_WINDOWEVENT_MINIMIZED)
+        {
+          _stopRendering = true;
+        }
+        if (e.window.event == SDL_WINDOWEVENT_RESTORED)
+        {
+          _stopRendering = false;
+        }
       }
 
       //send SDL event to imgui for handling
@@ -654,6 +660,26 @@ void VkEngine::run()
       ImGui::InputFloat4("data4", (float*)&selected.data.data4);
 
       ImGui::End();
+    }
+
+    // Extract keys from unordered_map into a vector of strings
+    std::vector<std::string> keys;
+    for (const auto& pair : _loadedNodes)
+    {
+      keys.push_back(pair.first.c_str());
+    }
+    // Display the combo box
+    if (ImGui::BeginCombo("Loaded nodes", _selectedNodeName.c_str()))
+    {
+      for (size_t i = 0; i < keys.size(); i++)
+      {
+        bool isSelected = keys[i] == _selectedNodeName;
+        if (ImGui::Selectable(keys[i].c_str(), isSelected))
+        {
+          _selectedNodeName = keys[i];
+        }
+      }
+      ImGui::EndCombo();
     }
 
     ImGui::Render();

@@ -226,10 +226,12 @@ class VkEngine
 
   DrawContext _mainDrawContext;
   std::unordered_map<std::string, std::shared_ptr<Node>> _loadedNodes;
+  std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> _loadedScenes;
+  std::string _selectedNodeName = "Suzanne";
+  std::string _selectedSceneName = "";
 
   Camera _mainCamera;
 
-  std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> _loadedScenes;
 
   EngineStats _stats;
 
