@@ -29,7 +29,7 @@ SpaceAfterTemplateKeyword: 'false'
 SpaceBeforeCtorInitializerColon: 'true'
 SpaceBeforeCpp11BracedList: false
 SpaceBeforeRangeBasedForLoopColon: 'true'
-UseTab: ForIndentation
+UseTab: Never
 SpaceInEmptyBlock: true
 Standard: 'Latest'
 ...

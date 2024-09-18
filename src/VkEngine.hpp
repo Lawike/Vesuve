@@ -2,6 +2,7 @@
 
 #include <VkBootstrap.h>
 #include "Camera.hpp"
+#include "Materials.h"
 #include "VkDescriptors.hpp"
 #include "VkLoader.hpp"
 #include "VkTypes.hpp"
@@ -31,45 +32,6 @@ struct MeshNode : public Node
 
   virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
 };
-
-
-struct GLTFMetallicRoughness
-{
-  MaterialPipeline opaquePipeline;
-  MaterialPipeline transparentPipeline;
-
-  VkDescriptorSetLayout materialLayout;
-
-  struct MaterialConstants
-  {
-    glm::vec4 colorFactors;
-    glm::vec4 metal_rough_factors;
-    //padding, we need it anyway for uniform buffers (256 bytes alignement)
-    glm::vec4 extra[14];
-  };
-
-  struct MaterialResources
-  {
-    AllocatedImage colorImage;
-    VkSampler colorSampler;
-    AllocatedImage metalRoughImage;
-    VkSampler metalRoughSampler;
-    VkBuffer dataBuffer;
-    uint32_t dataBufferOffset;
-  };
-
-  DescriptorWriter writer;
-
-  void buildPipelines(VkEngine* engine);
-  void clearResources(VkDevice device);
-
-  MaterialInstance writeMaterial(
-    VkDevice device,
-    MaterialPass pass,
-    const MaterialResources& resources,
-    DescriptorAllocatorGrowable& descriptorAllocator);
-};
-
 
 struct DeletionQueue
 {
@@ -245,6 +207,7 @@ class VkEngine
 
   // draw loop
   void draw();
+  void drawIndirect();
   void drawBackground(VkCommandBuffer cmd);
   void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView);
   void drawGeometry(VkCommandBuffer cmd);

@@ -139,8 +139,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
     constants.colorFactors.z = mat.pbrData.baseColorFactor[2];
     constants.colorFactors.w = mat.pbrData.baseColorFactor[3];
 
-    constants.metal_rough_factors.x = mat.pbrData.metallicFactor;
-    constants.metal_rough_factors.y = mat.pbrData.roughnessFactor;
+    constants.metalRoughFactors.x = mat.pbrData.metallicFactor;
+    constants.metalRoughFactors.y = mat.pbrData.roughnessFactor;
     // write material parameters to buffer
     sceneMaterialConstants[data_index] = constants;
 
@@ -202,82 +202,82 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
 
       // load indexes
       {
-	fastgltf::Accessor& indexaccessor = gltf.accessors[p.indicesAccessor.value()];
-	indices.reserve(indices.size() + indexaccessor.count);
+        fastgltf::Accessor& indexaccessor = gltf.accessors[p.indicesAccessor.value()];
+        indices.reserve(indices.size() + indexaccessor.count);
 
-	fastgltf::iterateAccessor<std::uint32_t>(
-	  gltf, indexaccessor, [&](std::uint32_t idx) { indices.push_back(idx + initial_vtx); });
+        fastgltf::iterateAccessor<std::uint32_t>(
+          gltf, indexaccessor, [&](std::uint32_t idx) { indices.push_back(idx + initial_vtx); });
       }
 
       // load vertex positions
       {
-	fastgltf::Accessor& posAccessor = gltf.accessors[p.findAttribute("POSITION")->accessorIndex];
-	vertices.resize(vertices.size() + posAccessor.count);
+        fastgltf::Accessor& posAccessor = gltf.accessors[p.findAttribute("POSITION")->accessorIndex];
+        vertices.resize(vertices.size() + posAccessor.count);
 
-	fastgltf::iterateAccessorWithIndex<glm::vec3>(
-	  gltf,
-	  posAccessor,
-	  [&](glm::vec3 v, size_t index)
-	  {
-	    Vertex newvtx;
-	    newvtx.position = v;
-	    newvtx.normal = {1, 0, 0};
-	    newvtx.color = glm::vec4{1.f};
-	    newvtx.uv_x = 0;
-	    newvtx.uv_y = 0;
-	    vertices[initial_vtx + index] = newvtx;
-	  });
+        fastgltf::iterateAccessorWithIndex<glm::vec3>(
+          gltf,
+          posAccessor,
+          [&](glm::vec3 v, size_t index)
+          {
+            Vertex newvtx;
+            newvtx.position = v;
+            newvtx.normal = {1, 0, 0};
+            newvtx.color = glm::vec4{1.f};
+            newvtx.uv_x = 0;
+            newvtx.uv_y = 0;
+            vertices[initial_vtx + index] = newvtx;
+          });
       }
 
       // load vertex normals
       auto normals = p.findAttribute("NORMAL");
       if (normals != p.attributes.end())
       {
-	fastgltf::iterateAccessorWithIndex<glm::vec3>(
-	  gltf,
-	  gltf.accessors[(*normals).accessorIndex],
-	  [&](glm::vec3 v, size_t index) { vertices[initial_vtx + index].normal = v; });
+        fastgltf::iterateAccessorWithIndex<glm::vec3>(
+          gltf,
+          gltf.accessors[(*normals).accessorIndex],
+          [&](glm::vec3 v, size_t index) { vertices[initial_vtx + index].normal = v; });
       }
 
       // load UVs
       auto uv = p.findAttribute("TEXCOORD_0");
       if (uv != p.attributes.end())
       {
-	fastgltf::iterateAccessorWithIndex<glm::vec2>(
-	  gltf,
-	  gltf.accessors[(*uv).accessorIndex],
-	  [&](glm::vec2 v, size_t index)
-	  {
-	    vertices[initial_vtx + index].uv_x = v.x;
-	    vertices[initial_vtx + index].uv_y = v.y;
-	  });
+        fastgltf::iterateAccessorWithIndex<glm::vec2>(
+          gltf,
+          gltf.accessors[(*uv).accessorIndex],
+          [&](glm::vec2 v, size_t index)
+          {
+            vertices[initial_vtx + index].uv_x = v.x;
+            vertices[initial_vtx + index].uv_y = v.y;
+          });
       }
 
       // load vertex colors
       auto colors = p.findAttribute("COLOR_0");
       if (colors != p.attributes.end())
       {
-	fastgltf::iterateAccessorWithIndex<glm::vec4>(
-	  gltf,
-	  gltf.accessors[(*colors).accessorIndex],
-	  [&](glm::vec4 v, size_t index) { vertices[initial_vtx + index].color = v; });
+        fastgltf::iterateAccessorWithIndex<glm::vec4>(
+          gltf,
+          gltf.accessors[(*colors).accessorIndex],
+          [&](glm::vec4 v, size_t index) { vertices[initial_vtx + index].color = v; });
       }
 
       if (p.materialIndex.has_value())
       {
-	newSurface.material = materials[p.materialIndex.value()];
+        newSurface.material = materials[p.materialIndex.value()];
       }
       else
       {
-	newSurface.material = materials[0];
+        newSurface.material = materials[0];
       }
 
       glm::vec3 minpos = vertices[initial_vtx].position;
       glm::vec3 maxpos = vertices[initial_vtx].position;
       for (int i = initial_vtx; i < vertices.size(); i++)
       {
-	minpos = glm::min(minpos, vertices[i].position);
-	maxpos = glm::max(maxpos, vertices[i].position);
+        minpos = glm::min(minpos, vertices[i].position);
+        maxpos = glm::max(maxpos, vertices[i].position);
       }
 
       newSurface.bounds.origin = (maxpos + minpos) / 2.f;
@@ -475,15 +475,15 @@ std::optional<AllocatedImage> vkloader::loadImage(VkEngine* engine, fastgltf::As
                                 4);
                               if (data)
                               {
-	                        VkExtent3D imagesize;
-	                        imagesize.width = width;
-	                        imagesize.height = height;
-	                        imagesize.depth = 1;
+                                VkExtent3D imagesize;
+                                imagesize.width = width;
+                                imagesize.height = height;
+                                imagesize.depth = 1;
 
-	                        newImage = engine->createImage(
-	                          data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+                                newImage = engine->createImage(
+                                  data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
-	                        stbi_image_free(data);
+                                stbi_image_free(data);
                               }
                             }},
           buffer.data);
@@ -594,65 +594,65 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> vkloader::loadGltfMeshes(
 
       // load indexes
       {
-	fastgltf::Accessor& indexaccessor = gltf.accessors[p.indicesAccessor.value()];
-	indices.reserve(indices.size() + indexaccessor.count);
+        fastgltf::Accessor& indexaccessor = gltf.accessors[p.indicesAccessor.value()];
+        indices.reserve(indices.size() + indexaccessor.count);
 
-	fastgltf::iterateAccessor<std::uint32_t>(
-	  gltf, indexaccessor, [&](std::uint32_t idx) { indices.push_back(idx + initial_vtx); });
+        fastgltf::iterateAccessor<std::uint32_t>(
+          gltf, indexaccessor, [&](std::uint32_t idx) { indices.push_back(idx + initial_vtx); });
       }
 
       // load vertex positions
       {
-	fastgltf::Accessor& posAccessor = gltf.accessors[p.findAttribute("POSITION")->accessorIndex];
-	vertices.resize(vertices.size() + posAccessor.count);
+        fastgltf::Accessor& posAccessor = gltf.accessors[p.findAttribute("POSITION")->accessorIndex];
+        vertices.resize(vertices.size() + posAccessor.count);
 
-	fastgltf::iterateAccessorWithIndex<glm::vec3>(
-	  gltf,
-	  posAccessor,
-	  [&](glm::vec3 v, size_t index)
-	  {
-	    Vertex newvtx;
-	    newvtx.position = v;
-	    newvtx.normal = {1, 0, 0};
-	    newvtx.color = glm::vec4{1.f};
-	    newvtx.uv_x = 0;
-	    newvtx.uv_y = 0;
-	    vertices[initial_vtx + index] = newvtx;
-	  });
+        fastgltf::iterateAccessorWithIndex<glm::vec3>(
+          gltf,
+          posAccessor,
+          [&](glm::vec3 v, size_t index)
+          {
+            Vertex newvtx;
+            newvtx.position = v;
+            newvtx.normal = {1, 0, 0};
+            newvtx.color = glm::vec4{1.f};
+            newvtx.uv_x = 0;
+            newvtx.uv_y = 0;
+            vertices[initial_vtx + index] = newvtx;
+          });
       }
 
       // load vertex normals
       auto normals = p.findAttribute("NORMAL");
       if (normals != p.attributes.end())
       {
-	fastgltf::iterateAccessorWithIndex<glm::vec3>(
-	  gltf,
-	  gltf.accessors[(*normals).accessorIndex],
-	  [&](glm::vec3 v, size_t index) { vertices[initial_vtx + index].normal = v; });
+        fastgltf::iterateAccessorWithIndex<glm::vec3>(
+          gltf,
+          gltf.accessors[(*normals).accessorIndex],
+          [&](glm::vec3 v, size_t index) { vertices[initial_vtx + index].normal = v; });
       }
 
       // load UVs
       auto uv = p.findAttribute("TEXCOORD_0");
       if (uv != p.attributes.end())
       {
-	fastgltf::iterateAccessorWithIndex<glm::vec2>(
-	  gltf,
-	  gltf.accessors[(*uv).accessorIndex],
-	  [&](glm::vec2 v, size_t index)
-	  {
-	    vertices[initial_vtx + index].uv_x = v.x;
-	    vertices[initial_vtx + index].uv_y = v.y;
-	  });
+        fastgltf::iterateAccessorWithIndex<glm::vec2>(
+          gltf,
+          gltf.accessors[(*uv).accessorIndex],
+          [&](glm::vec2 v, size_t index)
+          {
+            vertices[initial_vtx + index].uv_x = v.x;
+            vertices[initial_vtx + index].uv_y = v.y;
+          });
       }
 
       // load vertex colors
       auto colors = p.findAttribute("COLOR_0");
       if (colors != p.attributes.end())
       {
-	fastgltf::iterateAccessorWithIndex<glm::vec4>(
-	  gltf,
-	  gltf.accessors[(*colors).accessorIndex],
-	  [&](glm::vec4 v, size_t index) { vertices[initial_vtx + index].color = v; });
+        fastgltf::iterateAccessorWithIndex<glm::vec4>(
+          gltf,
+          gltf.accessors[(*colors).accessorIndex],
+          [&](glm::vec4 v, size_t index) { vertices[initial_vtx + index].color = v; });
       }
       newmesh.surfaces.push_back(newSurface);
     }
@@ -663,7 +663,7 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> vkloader::loadGltfMeshes(
     {
       for (Vertex& vtx : vertices)
       {
-	vtx.color = glm::vec4(vtx.normal, 1.f);
+        vtx.color = glm::vec4(vtx.normal, 1.f);
       }
     }
     newmesh.meshBuffers = engine->uploadMesh(indices, vertices);
