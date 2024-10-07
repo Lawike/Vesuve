@@ -33,7 +33,7 @@ add_executable(
     "Camera.hpp"
     "Materials.h"
     "Materials.cxx"
-)
+    "PointLight.hpp" )
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 

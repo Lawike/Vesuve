@@ -106,6 +106,7 @@ void VkEngine::init()
   this->initImgui();
   this->initDefaultData();
   this->initMainCamera();
+  this->initLight();
 
   //everything went fine
   _isInitialized = true;
@@ -556,6 +557,11 @@ void VkEngine::updateScene()
   auto view = _mainCamera.getViewMatrix();
 
   _sceneData.view = view;
+  _sceneData.lightPosition = _mainLight.position;
+  _sceneData.lightColor = _mainLight.color;
+  _sceneData.lightPower = _mainLight.power;
+  _sceneData.cameraPosition = glm::vec4(_mainCamera.position.x, _mainCamera.position.y, _mainCamera.position.z, 1.0f);
+
   // camera projection
   _sceneData.proj =
     glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
@@ -567,8 +573,6 @@ void VkEngine::updateScene()
 
   //some default lighting parameters
   _sceneData.ambientColor = glm::vec4(.1f);
-  _sceneData.sunlightColor = glm::vec4(1.f);
-  _sceneData.sunlightDirection = glm::vec4(0, 1, 0.5, 1.f);
 
   if (!_selectedNodeName.empty())
   {
@@ -687,6 +691,19 @@ void VkEngine::run()
       ImGui::EndCombo();
     }
 
+    if (ImGui::Begin("Scene elements"))
+    {
+      ImGui::InputFloat4("Light position", (float*)&_mainLight.position);
+      ImGui::InputFloat4("Light color", (float*)&_mainLight.color);
+      ImGui::InputFloat("Light power", (float*)&_mainLight.power);
+
+      ImGui::InputFloat4("Camera position", (float*)&_mainCamera.position);
+      ImGui::InputFloat("Camera yaw", (float*)&_mainCamera.yaw);
+
+
+      ImGui::End();
+    }
+
     ImGui::Render();
 
     //our draw function
@@ -801,11 +818,12 @@ void VkEngine::initSyncStructures()
 void VkEngine::initDescriptors()
 {
   //create a descriptor pool that will hold 10 sets with 1 image each
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}};
-
+  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
+    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
+    {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
+  };
   _globalDescriptorAllocator.init(_device, 10, sizes);
-
-  ;
 
   //make the descriptor set layout for our compute draw
   {
@@ -828,6 +846,17 @@ void VkEngine::initDescriptors()
     _gpuSceneDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
   }
 
+
+  //allocate a descriptor set for our draw image
+  _drawImageDescriptors = _globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
+
+  {
+    DescriptorWriter writer;
+    writer.writeImage(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+
+    writer.updateSet(_device, _drawImageDescriptors);
+  }
+
   //make sure both the descriptor allocator and the new layout get cleaned up properly
   _deletionQueue.push(
     [&]()
@@ -838,13 +867,6 @@ void VkEngine::initDescriptors()
       vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
     });
 
-  //allocate a descriptor set for our draw image
-  _drawImageDescriptors = _globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
-
-  DescriptorWriter writer;
-  writer.writeImage(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-
-  writer.updateSet(_device, _drawImageDescriptors);
 
   for (int i = 0; i < FRAME_OVERLAP; i++)
   {
@@ -1122,8 +1144,16 @@ void VkEngine::initDefaultData()
 void VkEngine::initMainCamera()
 {
   _mainCamera.velocity = glm::vec3(0.f);
-  _mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
+  _mainCamera.position = glm::vec3(0.f, -0.f, 5.f);
   _mainCamera.yaw = 0;
+}
+
+//--------------------------------------------------------------------------------------------------
+void VkEngine::initLight()
+{
+  _mainLight.position = glm::vec4(0.0f, 10.0f, 0.0f, 0.0f);
+  _mainLight.color = glm::vec4(1.0f);
+  _mainLight.power = 0.1;
 }
 
 //--------------------------------------------------------------------------------------------------

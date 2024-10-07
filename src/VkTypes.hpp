@@ -12,6 +12,7 @@
 #include <span>
 #include <string>
 #include <vector>
+#include "PointLight.hpp"
 
 struct Vertex
 {
@@ -53,8 +54,10 @@ struct GPUSceneData
   glm::mat4 proj;
   glm::mat4 viewproj;
   glm::vec4 ambientColor;
-  glm::vec4 sunlightDirection;  // w for sun power
-  glm::vec4 sunlightColor;
+  glm::vec4 cameraPosition;
+  glm::vec4 lightPosition;
+  glm::vec4 lightColor;
+  float lightPower;
 };
 
 enum class MaterialPass : uint8_t

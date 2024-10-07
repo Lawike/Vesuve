@@ -3,6 +3,7 @@
 #include <VkBootstrap.h>
 #include "Camera.hpp"
 #include "Materials.h"
+#include "PointLight.hpp"
 #include "VkDescriptors.hpp"
 #include "VkLoader.hpp"
 #include "VkTypes.hpp"
@@ -194,8 +195,9 @@ class VkEngine
 
   Camera _mainCamera;
 
-
   EngineStats _stats;
+
+  PointLight _mainLight;
 
   static VkEngine& Get();
 
@@ -240,6 +242,7 @@ class VkEngine
   void initMeshPipeline();
   void initDefaultData();
   void initMainCamera();
+  void initLight();
   void initImgui();
   vkb::Instance createInstance();
   vkb::PhysicalDevice pickPhysicalDevice(vkb::Instance& vkb_inst);
