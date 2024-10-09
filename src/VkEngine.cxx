@@ -611,7 +611,6 @@ void VkEngine::run()
         bQuit = true;
 
       _mainCamera.processSDLEvent(e);
-      ImGui_ImplSDL2_ProcessEvent(&e);
 
       if (e.type == SDL_WINDOWEVENT)
       {
