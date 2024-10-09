@@ -561,7 +561,10 @@ void VkEngine::updateScene()
   _sceneData.lightColor = _mainLight.color;
   _sceneData.lightPower = _mainLight.power;
   _sceneData.cameraPosition = glm::vec4(_mainCamera.position.x, _mainCamera.position.y, _mainCamera.position.z, 1.0f);
-
+  _sceneData.ambientCoefficient = _mainSurfaceProperties.ambientCoefficient;
+  _sceneData.specularCoefficient = _mainSurfaceProperties.specularCoefficient;
+  _sceneData.screenGamma = _mainSurfaceProperties.screenGamma;
+  _sceneData.shininess = _mainSurfaceProperties.shininess;
   // camera projection
   _sceneData.proj =
     glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
@@ -699,6 +702,10 @@ void VkEngine::run()
       ImGui::InputFloat4("Camera position", (float*)&_mainCamera.position);
       ImGui::InputFloat("Camera yaw", (float*)&_mainCamera.yaw);
 
+      ImGui::InputFloat("Ambient coefficient", (float*)&_mainSurfaceProperties.ambientCoefficient);
+      ImGui::InputFloat("Specular coefficient", (float*)&_mainSurfaceProperties.specularCoefficient);
+      ImGui::InputFloat("Shininess", (float*)&_mainSurfaceProperties.shininess);
+      ImGui::InputFloat("Gamma", (float*)&_mainSurfaceProperties.screenGamma);
 
       ImGui::End();
     }
@@ -1112,6 +1119,11 @@ void VkEngine::initDefaultData()
   sceneUniformData->colorFactors = glm::vec4{1, 1, 1, 1};
   sceneUniformData->metalRoughFactors = glm::vec4{1, 0.5, 0, 0};
 
+  _mainSurfaceProperties.ambientCoefficient = 0.1;
+  _mainSurfaceProperties.screenGamma = 2.2;
+  _mainSurfaceProperties.shininess = 8.0;
+  _mainSurfaceProperties.specularCoefficient = 0.5;
+
   _deletionQueue.push([=, this]() { destroyBuffer(materialConstants); });
 
   materialResources.dataBuffer = materialConstants.buffer;
@@ -1120,7 +1132,7 @@ void VkEngine::initDefaultData()
   _defaultData =
     _metalRoughMaterial.writeMaterial(_device, MaterialPass::MainColor, materialResources, _globalDescriptorAllocator);
 
-  _testMeshes = vkloader::loadGltfMeshes(this, "../assets/basicmesh.glb").value();
+  _testMeshes = vkloader::loadGltfMeshes(this, "../assets/scaled_teapot.glb").value();
 
   for (auto& m : _testMeshes)
   {

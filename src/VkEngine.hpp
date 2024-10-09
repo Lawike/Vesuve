@@ -93,6 +93,14 @@ struct EngineStats
   float meshDrawTime;
 };
 
+struct SurfaceProperties
+{
+  float specularCoefficient;
+  float ambientCoefficient;
+  float shininess;
+  float screenGamma;
+};
+
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
@@ -190,7 +198,7 @@ class VkEngine
   DrawContext _mainDrawContext;
   std::unordered_map<std::string, std::shared_ptr<Node>> _loadedNodes;
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> _loadedScenes;
-  std::string _selectedNodeName = "Suzanne";
+  std::string _selectedNodeName = "Teapot";
   std::string _selectedSceneName = "";
 
   Camera _mainCamera;
@@ -198,6 +206,9 @@ class VkEngine
   EngineStats _stats;
 
   PointLight _mainLight;
+
+  // Surface properties for tests
+  SurfaceProperties _mainSurfaceProperties;
 
   static VkEngine& Get();
 

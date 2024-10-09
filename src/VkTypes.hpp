@@ -58,6 +58,12 @@ struct GPUSceneData
   glm::vec4 lightPosition;
   glm::vec4 lightColor;
   float lightPower;
+  float specularCoefficient;
+  float ambientCoefficient;
+  float shininess;
+  float screenGamma;
+  // For 256 bytes alignment
+  float extra[59];
 };
 
 enum class MaterialPass : uint8_t

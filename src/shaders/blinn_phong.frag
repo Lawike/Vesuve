@@ -13,10 +13,10 @@ layout (location = 0) out vec4 outFragColor;
 vec4 ambientColor = sceneData.ambientColor;
 vec4 diffuseColor = vec4(0.0, 0.0, 0.0, 1.0);
 vec4 specColor = vec4(0.0, 0.0, 0.0, 1.0);
-const float shininess = 8.0;
-const float screenGamma = 2.2; // Assume the monitor is calibrated to the sRGB color space
-float ambientCoefficient = 0.1;
-float specularCoefficient = 0.5;
+float shininess = sceneData.shininess;
+float screenGamma = sceneData.screenGamma; // Assume the monitor is calibrated to the sRGB color space
+float ambientCoefficient = sceneData.ambientCoefficient;
+float specularCoefficient = sceneData.specularCoefficient;
 
 // test
 
