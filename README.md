@@ -8,6 +8,7 @@ At first, this project requires some external dependencies :
 - [SDL2](https://github.com/libsdl-org/SDL/)
 - [Imgui](https://github.com/ocornut/imgui)
 - [stb](https://github.com/nothings/stb)
+
 Please get and install those before continuing.
 
 ### Build Guide
