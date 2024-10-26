@@ -41,10 +41,6 @@ if(NOT DEFINED ENV{STB_DIR})
     message(FATAL_ERROR "La variable d'environnement STB_DIR n'est pas définie.")
 endif()
 target_include_directories(Vesuve PRIVATE $ENV{STB_DIR})
-if(NOT DEFINED ENV{TINY_OBJ_LOADER_DIR})
-    message(FATAL_ERROR "La variable d'environnement TINY_OBJ_LOADER_DIR n'est pas définie.")
-endif()
-target_include_directories(Vesuve PRIVATE $ENV{TINY_OBJ_LOADER_DIR})
 
 target_link_libraries(Vesuve PRIVATE 
 	glm::glm
@@ -63,6 +59,9 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "*.frag"
     "*.vert"
     "*.comp"
+    "*.rgen"
+    "*.rmiss"
+    "*.rchit"
 )
 
 foreach(GLSL ${GLSL_SOURCE_FILES})

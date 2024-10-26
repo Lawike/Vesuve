@@ -61,3 +61,6 @@ To know which kinf of memory for which usage :
 https://www.fevrierdorian.com/carnet/pages/ecrire-un-moteur-de-rendu-vulkan-performant.html#selection-de-la-memoire-de-tas
 
 Always allocate image ressources first on bufferImageGranularity since they usually require a bigger alignment.
+
+## Scope refactor
+When building my descriptor layouts I could make static function to avoid declaring a variable each time.
