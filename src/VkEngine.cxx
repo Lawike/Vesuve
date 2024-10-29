@@ -1,9 +1,13 @@
 #define VMA_IMPLEMENTATION
+#ifndef IMGUI_H
+#define IMGUI_H
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>
 #include <imgui_impl_vulkan.h>
+#endif
 #ifndef SDL_H
 #define SDL_H
+#define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 #endif
@@ -15,6 +19,7 @@
 #include <set>
 #include <thread>
 #include "DebugUtils.hpp"
+#include "UserInterface.hpp"
 #include "VkDescriptors.hpp"
 #include "VkEngine.hpp"
 #include "VkImages.hpp"
@@ -86,16 +91,7 @@ VkEngine::~VkEngine()
 void VkEngine::init()
 {
   // We initialize SDL and create a window with it.
-  SDL_Init(SDL_INIT_VIDEO);
-
-  SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
-  _window = SDL_CreateWindow(
-    "Vesuve Vulkan Engine",
-    SDL_WINDOWPOS_UNDEFINED,
-    SDL_WINDOWPOS_UNDEFINED,
-    _windowExtent.width,
-    _windowExtent.height,
-    window_flags);
+  _window = std::make_unique<Window>(_windowExtent);
 
   this->initVulkan();
   this->initSwapchain();
@@ -162,7 +158,6 @@ void VkEngine::cleanup()
       DebugUtils::DestroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
     }
     vkDestroyInstance(_instance, nullptr);
-    SDL_DestroyWindow(_window);
   }
   // clear engine pointer
   loadedEngine = nullptr;
@@ -607,26 +602,12 @@ void VkEngine::run()
     auto start = std::chrono::system_clock::now();
 
     //Handle events on queue
-    while (SDL_PollEvent(&e) != 0)
+    while (_window->pollEvent(e) != 0)
     {
       //close the window when user alt-f4s or clicks the X button
-      if (e.type == SDL_QUIT)
-        bQuit = true;
-
+      bQuit = _window->processEvent(e);
+      _stopRendering = _window->isMinimized();
       _mainCamera.processSDLEvent(e);
-
-      if (e.type == SDL_WINDOWEVENT)
-      {
-        if (e.window.event == SDL_WINDOWEVENT_MINIMIZED)
-        {
-          _stopRendering = true;
-        }
-        if (e.window.event == SDL_WINDOWEVENT_RESTORED)
-        {
-          _stopRendering = false;
-        }
-      }
-
       //send SDL event to imgui for handling
       ImGui_ImplSDL2_ProcessEvent(&e);
     }
@@ -642,75 +623,7 @@ void VkEngine::run()
       continue;
     }
 
-    // imgui new frame
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-
-    ImGui::NewFrame();
-
-    ImGui::Begin("Stats");
-    ImGui::Text("frametime %f ms", _stats.frametime);
-    ImGui::Text("draw time %f ms", _stats.meshDrawTime);
-    ImGui::Text("update time %f ms", _stats.sceneUpdateTime);
-    ImGui::Text("triangles %i", _stats.triangleCount);
-    ImGui::Text("draws %i", _stats.drawcallCount);
-    ImGui::End();
-
-    if (ImGui::Begin("background"))
-    {
-      ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);
-      ComputeEffect& selected = _backgroundEffects[_currentBackgroundEffect];
-
-      ImGui::Text("Selected effect: ", selected.name);
-
-      ImGui::SliderInt("Effect Index", &_currentBackgroundEffect, 0, _backgroundEffects.size() - 1);
-
-      ImGui::InputFloat4("data1", (float*)&selected.data.data1);
-      ImGui::InputFloat4("data2", (float*)&selected.data.data2);
-      ImGui::InputFloat4("data3", (float*)&selected.data.data3);
-      ImGui::InputFloat4("data4", (float*)&selected.data.data4);
-
-      ImGui::End();
-    }
-
-    // Extract keys from unordered_map into a vector of strings
-    std::vector<std::string> keys;
-    for (const auto& pair : _loadedNodes)
-    {
-      keys.push_back(pair.first.c_str());
-    }
-    // Display the combo box
-    if (ImGui::BeginCombo("Loaded nodes", _selectedNodeName.c_str()))
-    {
-      for (size_t i = 0; i < keys.size(); i++)
-      {
-        bool isSelected = keys[i] == _selectedNodeName;
-        if (ImGui::Selectable(keys[i].c_str(), isSelected))
-        {
-          _selectedNodeName = keys[i];
-        }
-      }
-      ImGui::EndCombo();
-    }
-
-    if (ImGui::Begin("Scene elements"))
-    {
-      ImGui::InputFloat4("Light position", (float*)&_mainLight.position);
-      ImGui::InputFloat4("Light color", (float*)&_mainLight.color);
-      ImGui::InputFloat("Light power", (float*)&_mainLight.power);
-
-      ImGui::InputFloat4("Camera position", (float*)&_mainCamera.position);
-      ImGui::InputFloat("Camera yaw", (float*)&_mainCamera.yaw);
-
-      ImGui::InputFloat("Ambient coefficient", (float*)&_mainSurfaceProperties.ambientCoefficient);
-      ImGui::InputFloat("Specular coefficient", (float*)&_mainSurfaceProperties.specularCoefficient);
-      ImGui::InputFloat("Shininess", (float*)&_mainSurfaceProperties.shininess);
-      ImGui::InputFloat("Gamma", (float*)&_mainSurfaceProperties.screenGamma);
-
-      ImGui::End();
-    }
-
-    ImGui::Render();
+    UserInterface::display(this);
 
     //our draw function
     this->updateScene();
@@ -1202,7 +1115,7 @@ void VkEngine::initImgui()
   ImGui::CreateContext();
 
   // this initializes imgui for SDL
-  ImGui_ImplSDL2_InitForVulkan(_window);
+  ImGui_ImplSDL2_InitForVulkan(_window->Handle());
 
   // this initializes imgui for Vulkan
   ImGui_ImplVulkan_InitInfo initInfo = {};
@@ -1340,7 +1253,7 @@ void VkEngine::resizeSwapchain()
   destroySwapchain();
 
   int w, h;
-  SDL_GetWindowSize(_window, &w, &h);
+  SDL_GetWindowSize(_window->Handle(), &w, &h);
   _windowExtent.width = w;
   _windowExtent.height = h;
 
@@ -1352,7 +1265,7 @@ void VkEngine::resizeSwapchain()
 //--------------------------------------------------------------------------------------------------
 void VkEngine::createSurface()
 {
-  if (SDL_Vulkan_CreateSurface(_window, _instance, &_surface) != SDL_TRUE)
+  if (SDL_Vulkan_CreateSurface(_window->Handle(), _instance, &_surface) != SDL_TRUE)
   {
     throw std::runtime_error("failed to create window surface!");
   }

@@ -2,11 +2,12 @@
 
 #include <VkBootstrap.h>
 #include "Camera.hpp"
-#include "Materials.h"
+#include "Materials.hpp"
 #include "PointLight.hpp"
 #include "VkDescriptors.hpp"
 #include "VkLoader.hpp"
 #include "VkTypes.hpp"
+#include "Window.hpp"
 
 struct RenderObject
 {
@@ -119,7 +120,7 @@ class VkEngine
   bool _stopRendering{false};
   VkExtent2D _windowExtent{1700, 900};
 
-  struct SDL_Window* _window{nullptr};
+  std::unique_ptr<Window> _window;
 
   VkInstance _instance;                                                            // Vulkan library handle
   VkDebugUtilsMessengerEXT _debugMessenger;                                        // Vulkan debug output handle

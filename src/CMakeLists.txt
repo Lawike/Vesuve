@@ -31,9 +31,13 @@ add_executable(
     "VkLoader.cxx"
     "Camera.cxx"
     "Camera.hpp"
-    "Materials.h"
+    "Materials.hpp"
     "Materials.cxx"
-    "PointLight.hpp" )
+    "PointLight.hpp"
+    "Window.cxx"
+    "Window.hpp"
+    "UserInterface.cxx"
+    "UserInterface.hpp")
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
