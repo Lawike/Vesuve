@@ -17,7 +17,7 @@ class Window
   ~Window();
 
   // Window instance properties.
-  SDL_Window* Handle() const
+  SDL_Window* handle() const
   {
     return _sdlHandle;
   }

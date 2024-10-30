@@ -2,12 +2,17 @@
 
 #include <VkBootstrap.h>
 #include "Camera.hpp"
+#include "Device.hpp"
+#include "Instance.hpp"
 #include "Materials.hpp"
+#include "PhysicalDevice.hpp"
 #include "PointLight.hpp"
 #include "VkDescriptors.hpp"
 #include "VkLoader.hpp"
 #include "VkTypes.hpp"
 #include "Window.hpp"
+
+using namespace VulkanBackend;
 
 struct RenderObject
 {
@@ -121,11 +126,9 @@ class VkEngine
   VkExtent2D _windowExtent{1700, 900};
 
   std::unique_ptr<Window> _window;
-
-  VkInstance _instance;                                                            // Vulkan library handle
-  VkDebugUtilsMessengerEXT _debugMessenger;                                        // Vulkan debug output handle
-  VkPhysicalDevice _chosenGPU;                                                     // GPU chosen as the default device
-  VkDevice _device;                                                                // Vulkan device for commands
+  std::unique_ptr<Instance> _instance;                                             // Vulkan library handle
+  std::unique_ptr<PhysicalDevice> _chosenGPU;                                      // GPU chosen as the default device
+  std::unique_ptr<Device> _device;                                                 // Vulkan device for commands
   VkSurfaceKHR _surface;                                                           // Vulkan window surface
   std::vector<const char*> _deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};  // Supported device extensions
   VkQueue _presentQueue;           // Vulkan present queue for presentation commands
@@ -141,8 +144,6 @@ class VkEngine
     return _frames[_frameNumber % FRAME_OVERLAP];
   };
 
-  VkQueue _graphicsQueue;  // Vulkan graphic queue for graphic commands
-  uint32_t _graphicsQueueFamily;
   VkCommandPool _commandPool;
 
   DeletionQueue _deletionQueue;  //Queue that keeps tracks of all the allocated structures.
@@ -256,9 +257,7 @@ class VkEngine
   void initMainCamera();
   void initLight();
   void initImgui();
-  vkb::Instance createInstance();
-  vkb::PhysicalDevice pickPhysicalDevice(vkb::Instance& vkb_inst);
-  void createLogicalDevice(vkb::PhysicalDevice& physicalDevice);
+  void createInstance();
   void createSwapchain(uint32_t width, uint32_t height);
   void destroySwapchain();
   void resizeSwapchain();

@@ -74,7 +74,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
     {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
     {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
 
-  file.descriptorPool.init(engine->_device, gltf.materials.size(), sizes);
+  file.descriptorPool.init(engine->_device->getHandle().device, gltf.materials.size(), sizes);
 
   // load samplers
   for (fastgltf::Sampler& sampler : gltf.samplers)
@@ -89,7 +89,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
     sampl.mipmapMode = extractMipmapMode(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
 
     VkSampler newSampler;
-    vkCreateSampler(engine->_device, &sampl, nullptr, &newSampler);
+    vkCreateSampler(engine->_device->getHandle().device, &sampl, nullptr, &newSampler);
 
     file.samplers.push_back(newSampler);
   }
@@ -170,8 +170,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
       materialResources.colorSampler = file.samplers[sampler];
     }
     // build material
-    newMat->data =
-      engine->_metalRoughMaterial.writeMaterial(engine->_device, passType, materialResources, file.descriptorPool);
+    newMat->data = engine->_metalRoughMaterial.writeMaterial(
+      engine->_device->getHandle().device, passType, materialResources, file.descriptorPool);
 
     data_index++;
   }
@@ -517,7 +517,7 @@ void LoadedGLTF::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
 //--------------------------------------------------------------------------------------------------
 void LoadedGLTF::clearAll()
 {
-  VkDevice dv = creator->_device;
+  VkDevice dv = creator->_device->getHandle().device;
 
   descriptorPool.destroyPools(dv);
   creator->destroyBuffer(materialDataBuffer);

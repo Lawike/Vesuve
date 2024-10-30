@@ -5,8 +5,6 @@ add_executable(
     "VkEngine.hpp"
     "DebugUtils.hpp"
     "DebugUtils.cxx"
-    "PhysicalDevicePicker.hpp"
-    "PhysicalDevicePicker.cxx"
     "SwapChainSupportDetails.hpp"
     "SwapChainSupportDetails.cxx"
     "QueueFamilyIndices.hpp"
@@ -37,7 +35,15 @@ add_executable(
     "Window.cxx"
     "Window.hpp"
     "UserInterface.cxx"
-    "UserInterface.hpp")
+    "UserInterface.hpp"
+    "Instance.cxx"
+    "Instance.hpp"
+    "PhysicalDevice.cxx"
+    "PhysicalDevice.hpp"
+    "Device.cxx"
+    "Device.hpp"
+    "Swapchain.cxx"
+    "Swapchain.hpp")
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
