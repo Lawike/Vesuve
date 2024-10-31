@@ -7,6 +7,7 @@
 #include "Materials.hpp"
 #include "PhysicalDevice.hpp"
 #include "PointLight.hpp"
+#include "Swapchain.hpp"
 #include "VkDescriptors.hpp"
 #include "VkLoader.hpp"
 #include "VkTypes.hpp"
@@ -126,17 +127,12 @@ class VkEngine
   VkExtent2D _windowExtent{1700, 900};
 
   std::unique_ptr<Window> _window;
-  std::unique_ptr<Instance> _instance;                                             // Vulkan library handle
-  std::unique_ptr<PhysicalDevice> _chosenGPU;                                      // GPU chosen as the default device
-  std::unique_ptr<Device> _device;                                                 // Vulkan device for commands
-  VkSurfaceKHR _surface;                                                           // Vulkan window surface
-  std::vector<const char*> _deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};  // Supported device extensions
-  VkQueue _presentQueue;           // Vulkan present queue for presentation commands
-  VkSwapchainKHR _swapchain;       // Vulkan swapchain to transfer images between queues
-  VkFormat _swapchainImageFormat;  // Vulkan image format for the swapchain
-  std::vector<VkImage> _swapchainImages{};
-  std::vector<VkImageView> _swapchainImageViews;
-  VkExtent2D _swapchainExtent;
+  std::unique_ptr<Instance> _instance;         // Vulkan library handle
+  std::unique_ptr<PhysicalDevice> _chosenGPU;  // GPU chosen as the default device
+  std::unique_ptr<Device> _device;             // Vulkan device for commands
+  VkSurfaceKHR _surface;                       // Vulkan window surface
+  VkQueue _presentQueue;                       // Vulkan present queue for presentation commands
+  std::unique_ptr<Swapchain> _swapchain;       // Vulkan swapchain to transfer images between queues
 
   FrameData _frames[FRAME_OVERLAP];
   FrameData& getCurrentFrame()
@@ -257,8 +253,6 @@ class VkEngine
   void initMainCamera();
   void initLight();
   void initImgui();
-  void createInstance();
-  void createSwapchain(uint32_t width, uint32_t height);
   void destroySwapchain();
   void resizeSwapchain();
   void createSurface();
