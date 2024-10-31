@@ -190,8 +190,9 @@ void VkEngine::draw()
     return;
   }
 
-  _drawExtent.height = std::min(_swapchain->getSwapchainExtent().height, _drawImage.imageExtent.height) * renderScale;
-  _drawExtent.width = std::min(_swapchain->getSwapchainExtent().width, _drawImage.imageExtent.width) * renderScale;
+  _drawExtent.height =
+    std::min(_swapchain->getSwapchainExtent().height, _drawImage->_handle.imageExtent.height) * renderScale;
+  _drawExtent.width = std::min(_swapchain->getSwapchainExtent().width, _drawImage->_handle.imageExtent.width) * renderScale;
 
   VK_CHECK(vkResetFences(_device->getHandle(), 1, &this->getCurrentFrame()._renderFence));
 
@@ -208,13 +209,14 @@ void VkEngine::draw()
 
   // transition our main draw image into general layout so we can write into it
   // we will overwrite it all so we dont care about what was the older layout
-  vkutil::transitionImage(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transitionImage(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil::transitionImage(cmd, _drawImage->_handle.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+  vkutil::transitionImage(
+    cmd, _depthImage->_handle.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   drawMain(cmd);
 
   //transtion the draw image and the swapchain image into their correct transfer layouts
-  vkutil::transitionImage(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  vkutil::transitionImage(cmd, _drawImage->_handle.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   vkutil::transitionImage(
     cmd,
     _swapchain->getSwapchainImages()[swapchainImageIndex],
@@ -228,7 +230,7 @@ void VkEngine::draw()
   // execute a copy from the draw image into the swapchain
   vkutil::copyImageToImage(
     cmd,
-    _drawImage.image,
+    _drawImage->_handle.image,
     _swapchain->getSwapchainImages()[swapchainImageIndex],
     _drawExtent,
     _swapchain->getSwapchainExtent());
@@ -485,9 +487,10 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
   vkCmdDispatch(cmd, std::ceil(_windowExtent.width / 16.0), std::ceil(_windowExtent.height / 16.0), 1);
 
 
-  VkRenderingAttachmentInfo colorAttachment = vkinit::attachmentInfo(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+  VkRenderingAttachmentInfo colorAttachment =
+    vkinit::attachmentInfo(_drawImage->_handle.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo depthAttachment =
-    vkinit::depthAttachmentInfo(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    vkinit::depthAttachmentInfo(_depthImage->_handle.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingInfo renderInfo = vkinit::renderingInfo(_windowExtent, &colorAttachment, &depthAttachment);
 
@@ -789,7 +792,8 @@ void VkEngine::initDescriptors()
 
   {
     DescriptorWriter writer;
-    writer.writeImage(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    writer.writeImage(
+      0, _drawImage->_handle.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
     writer.updateSet(_device->getHandle(), _drawImageDescriptors);
   }
@@ -826,7 +830,8 @@ void VkEngine::initDescriptors()
 void VkEngine::initPipelines()
 {
   this->initBackgroundPipelines();
-  _metalRoughMaterial.buildPipelines(_device->getHandle(), _gpuSceneDataDescriptorLayout, _drawImage, _depthImage);
+  _metalRoughMaterial.buildPipelines(
+    _device->getHandle(), _gpuSceneDataDescriptorLayout, _drawImage->_handle, _depthImage->_handle);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -968,8 +973,8 @@ void VkEngine::initMeshPipeline()
   pipelineBuilder.enableDepthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
   //connect the image format we will draw into, from draw image
-  pipelineBuilder.setColorAttachmentFormat(_drawImage.imageFormat);
-  pipelineBuilder.setDepthFormat(_depthImage.imageFormat);
+  pipelineBuilder.setColorAttachmentFormat(_drawImage->_handle.imageFormat);
+  pipelineBuilder.setDepthFormat(_depthImage->_handle.imageFormat);
 
   //finally build the pipeline
   _meshPipeline = pipelineBuilder.buildPipeline(_device->getHandle());
@@ -1140,7 +1145,7 @@ void VkEngine::initImgui()
   // this initializes imgui for Vulkan
   ImGui_ImplVulkan_InitInfo initInfo = {};
   initInfo.Instance = _instance->getHandle();
-  initInfo.PhysicalDevice = _chosenGPU->getHandle().physical_device;
+  initInfo.PhysicalDevice = _chosenGPU->getHandle();
   initInfo.Device = _device->getHandle();
   initInfo.Queue = _device->getGraphicsQueue();
   initInfo.DescriptorPool = imguiPool;
@@ -1213,7 +1218,7 @@ void VkEngine::createMemoryAllocator()
 {
   // initialize the memory allocator
   VmaAllocatorCreateInfo allocatorInfo = {};
-  allocatorInfo.physicalDevice = _chosenGPU->getHandle().physical_device;
+  allocatorInfo.physicalDevice = _chosenGPU->getHandle();
   allocatorInfo.device = _device->getHandle();
   allocatorInfo.instance = _instance->getHandle();
   allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
@@ -1310,12 +1315,8 @@ void VkEngine::destroyImage(const AllocatedImage& img)
 //--------------------------------------------------------------------------------------------------
 void VkEngine::createDrawImage()
 {
-  //draw image size will match the window
-  VkExtent3D drawImageExtent = {_windowExtent.width, _windowExtent.height, 1};
-
   //hardcoding the draw format to 32 bit float
-  _drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-  _drawImage.imageExtent = drawImageExtent;
+  VkFormat imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 
   VkImageUsageFlags drawImageUsages{};
   drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -1323,18 +1324,9 @@ void VkEngine::createDrawImage()
   drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
   drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-  VkImageCreateInfo imgInfo = vkinit::imageCreateInfo(_drawImage.imageFormat, drawImageUsages, drawImageExtent);
+  _drawImage = std::make_unique<Image>(_windowExtent, imageFormat, drawImageUsages, _allocator);
 
-  //for the draw image, we want to allocate it from gpu local memory
-  VmaAllocationCreateInfo imgAllocInfo = {};
-  imgAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-  imgAllocInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-  //allocate and create the image
-  vmaCreateImage(_allocator, &imgInfo, &imgAllocInfo, &_drawImage.image, &_drawImage.allocation, nullptr);
-
-  //add to deletion queues
-  _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation); });
+  _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _drawImage->_handle.image, _drawImage->_handle.allocation); });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1342,12 +1334,12 @@ void VkEngine::createDrawImageView()
 {
   //build a image-view for the draw image to use for rendering
   VkImageViewCreateInfo viewInfo =
-    vkinit::imageViewCreateInfo(_drawImage.imageFormat, _drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
+    vkinit::imageViewCreateInfo(_drawImage->_handle.imageFormat, _drawImage->_handle.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
-  VK_CHECK(vkCreateImageView(_device->getHandle(), &viewInfo, nullptr, &_drawImage.imageView));
+  VK_CHECK(vkCreateImageView(_device->getHandle(), &viewInfo, nullptr, &_drawImage->_handle.imageView));
 
   //add to deletion queues
-  _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _drawImage.imageView, nullptr); });
+  _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _drawImage->_handle.imageView, nullptr); });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1355,22 +1347,12 @@ void VkEngine::createDepthImage()
 {
   //draw image size will match the window
   VkExtent3D depthImageExtent = {_windowExtent.width, _windowExtent.height, 1};
-  _depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
-  _depthImage.imageExtent = depthImageExtent;
+  VkFormat imageFormat = VK_FORMAT_D32_SFLOAT;
   VkImageUsageFlags depthImageUsages{};
   depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-  VkImageCreateInfo dimg_info = vkinit::imageCreateInfo(_depthImage.imageFormat, depthImageUsages, depthImageExtent);
-
-  //allocate and create the image
-  //for the draw image, we want to allocate it from gpu local memory
-  VmaAllocationCreateInfo imgAllocInfo = {};
-  imgAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-  imgAllocInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-  vmaCreateImage(_allocator, &dimg_info, &imgAllocInfo, &_depthImage.image, &_depthImage.allocation, nullptr);
-  //add to deletion queues
-  _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation); });
+  _depthImage = std::make_unique<Image>(_windowExtent, imageFormat, depthImageUsages, _allocator);
+  _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _depthImage->_handle.image, _depthImage->_handle.allocation); });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1378,11 +1360,11 @@ void VkEngine::createDepthImageView()
 {
   //build a image-view for the draw image to use for rendering
   VkImageViewCreateInfo dview_info =
-    vkinit::imageViewCreateInfo(_depthImage.imageFormat, _depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+    vkinit::imageViewCreateInfo(_depthImage->_handle.imageFormat, _depthImage->_handle.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-  VK_CHECK(vkCreateImageView(_device->getHandle(), &dview_info, nullptr, &_depthImage.imageView));
+  VK_CHECK(vkCreateImageView(_device->getHandle(), &dview_info, nullptr, &_depthImage->_handle.imageView));
   //add to deletion queues
-  _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _depthImage.imageView, nullptr); });
+  _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _depthImage->_handle.imageView, nullptr); });
 }
 
 //--------------------------------------------------------------------------------------------------

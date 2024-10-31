@@ -43,7 +43,10 @@ add_executable(
     "Device.cxx"
     "Device.hpp"
     "Swapchain.cxx"
-    "Swapchain.hpp")
+    "Swapchain.hpp"
+    "Image.cxx"
+    "Image.hpp"
+)
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 

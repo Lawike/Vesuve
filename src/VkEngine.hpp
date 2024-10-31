@@ -3,6 +3,7 @@
 #include <VkBootstrap.h>
 #include "Camera.hpp"
 #include "Device.hpp"
+#include "Image.hpp"
 #include "Instance.hpp"
 #include "Materials.hpp"
 #include "PhysicalDevice.hpp"
@@ -147,10 +148,10 @@ class VkEngine
   VmaAllocator _allocator;
 
   //draw resources
-  AllocatedImage _drawImage;
+  std::unique_ptr<Image> _drawImage;
   VkExtent2D _drawExtent;
   float renderScale = 1.f;
-  AllocatedImage _depthImage;
+  std::unique_ptr<Image> _depthImage;
 
   DescriptorAllocatorGrowable _globalDescriptorAllocator;
 
