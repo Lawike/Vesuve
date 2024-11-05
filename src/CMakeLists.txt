@@ -46,6 +46,21 @@ add_executable(
     "Swapchain.hpp"
     "Image.cxx"
     "Image.hpp"
+    "CommandPool.cxx"
+    "CommandPool.hpp"
+    "FrameData.cxx"
+    "FrameData.hpp"
+    "CommandBuffer.cxx"
+    "CommandPool.hpp"
+    "CommandBuffer.hpp"
+    "Fence.cxx"
+    "Fence.hpp"
+    "Semaphore.cxx"
+    "Semaphore.hpp"
+    "DescriptorSetLayout.cxx"
+    "DescriptorSetLayout.hpp"
+    "DescriptorSet.cxx"
+    "DescriptorSet.hpp"
 )
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)

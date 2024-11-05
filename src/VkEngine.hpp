@@ -2,7 +2,10 @@
 
 #include <VkBootstrap.h>
 #include "Camera.hpp"
+#include "DescriptorSet.hpp"
+#include "DescriptorSetLayout.hpp"
 #include "Device.hpp"
+#include "FrameData.hpp"
 #include "Image.hpp"
 #include "Instance.hpp"
 #include "Materials.hpp"
@@ -42,44 +45,12 @@ struct MeshNode : public Node
   virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
 };
 
-struct DeletionQueue
-{
-  std::deque<std::function<void()>> deletors;
-
-  void push(std::function<void()>&& function)
-  {
-    deletors.push_back(function);
-  }
-
-  void flush()
-  {
-    // reverse iterate the deletion queue to execute all the functions
-    for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
-    {
-      (*it)();  //call functors
-    }
-
-    deletors.clear();
-  }
-};
-
 struct ComputePushConstants
 {
   glm::vec4 data1;
   glm::vec4 data2;
   glm::vec4 data3;
   glm::vec4 data4;
-};
-
-
-struct FrameData
-{
-  VkCommandPool _commandPool;
-  VkCommandBuffer _mainCommandBuffer;
-  VkSemaphore _swapchainSemaphore, _renderSemaphore;
-  VkFence _renderFence;
-  DeletionQueue _deletionQueue;
-  DescriptorAllocatorGrowable _frameDescriptors;
 };
 
 struct ComputeEffect
@@ -134,14 +105,11 @@ class VkEngine
   VkSurfaceKHR _surface;                       // Vulkan window surface
   VkQueue _presentQueue;                       // Vulkan present queue for presentation commands
   std::unique_ptr<Swapchain> _swapchain;       // Vulkan swapchain to transfer images between queues
-
-  FrameData _frames[FRAME_OVERLAP];
-  FrameData& getCurrentFrame()
+  std::vector<std::unique_ptr<FrameData>> _frames;
+  std::unique_ptr<FrameData>& getCurrentFrame()
   {
-    return _frames[_frameNumber % FRAME_OVERLAP];
-  };
-
-  VkCommandPool _commandPool;
+    return _frames.at(_frameNumber % FRAME_OVERLAP);
+  }
 
   DeletionQueue _deletionQueue;  //Queue that keeps tracks of all the allocated structures.
 
@@ -155,16 +123,16 @@ class VkEngine
 
   DescriptorAllocatorGrowable _globalDescriptorAllocator;
 
-  VkDescriptorSet _drawImageDescriptors;
-  VkDescriptorSetLayout _drawImageDescriptorLayout;
+  std::unique_ptr<DescriptorSet> _drawImageDescriptors;
+  std::unique_ptr<DescriptorSetLayout> _drawImageDescriptorLayout;
 
   VkPipeline _gradientPipeline;
   VkPipelineLayout _gradientPipelineLayout;
 
   // immediate submit structures
-  VkFence _immFence;
-  VkCommandBuffer _immCommandBuffer;
-  VkCommandPool _immCommandPool;
+  std::unique_ptr<Fence> _immFence;
+  std::unique_ptr<CommandBuffer> _immCommandBuffer;
+  std::unique_ptr<CommandPool> _immCommandPool;
 
   std::vector<ComputeEffect> _backgroundEffects;
   int _currentBackgroundEffect{0};
@@ -178,7 +146,7 @@ class VkEngine
 
   GPUSceneData _sceneData;
 
-  VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+  std::unique_ptr<DescriptorSetLayout> _gpuSceneDataDescriptorLayout;
 
   //Default texture for tests
   AllocatedImage _whiteImage;
@@ -189,7 +157,7 @@ class VkEngine
   VkSampler _defaultSamplerLinear;
   VkSampler _defaultSamplerNearest;
 
-  VkDescriptorSetLayout _singleImageDescriptorLayout;
+  std::unique_ptr<DescriptorSetLayout> _singleImageDescriptorLayout;
 
   MaterialInstance _defaultData;
   GLTFMetallicRoughness _metalRoughMaterial;
@@ -244,8 +212,8 @@ class VkEngine
  private:
   void initVulkan();
   void initSwapchain();
-  void initCommands();
-  void initSyncStructures();
+  void initFrameData();
+  void initImmediateCommands();
   void initDescriptors();
   void initPipelines();
   void initBackgroundPipelines();

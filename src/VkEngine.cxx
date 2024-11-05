@@ -95,8 +95,8 @@ void VkEngine::init()
 
   this->initVulkan();
   this->initSwapchain();
-  this->initCommands();
-  this->initSyncStructures();
+  this->initFrameData();
+  this->initImmediateCommands();
   this->initDescriptors();
   this->initPipelines();
   this->initImgui();
@@ -129,14 +129,14 @@ void VkEngine::cleanup()
     for (int i = 0; i < FRAME_OVERLAP; i++)
     {
       //already written from before
-      vkDestroyCommandPool(_device->getHandle(), _frames[i]._commandPool, nullptr);
+      vkDestroyCommandPool(_device->getHandle(), _frames[i]->_commandPool->getHandle(), nullptr);
 
       //destroy sync objects
-      vkDestroyFence(_device->getHandle(), _frames[i]._renderFence, nullptr);
-      vkDestroySemaphore(_device->getHandle(), _frames[i]._renderSemaphore, nullptr);
-      vkDestroySemaphore(_device->getHandle(), _frames[i]._swapchainSemaphore, nullptr);
+      vkDestroyFence(_device->getHandle(), _frames[i]->_renderFence->_handle, nullptr);
+      vkDestroySemaphore(_device->getHandle(), _frames[i]->_renderSemaphore->_handle, nullptr);
+      vkDestroySemaphore(_device->getHandle(), _frames[i]->_swapchainSemaphore->_handle, nullptr);
 
-      _frames[i]._deletionQueue.flush();
+      _frames[i]->_deletionQueue.flush();
     }
 
     for (auto& mesh : _testMeshes)
@@ -170,10 +170,10 @@ void VkEngine::cleanup()
 void VkEngine::draw()
 {
   //wait until the gpu has finished rendering the last frame. Timeout of 1 second
-  VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &this->getCurrentFrame()._renderFence, true, 1000000000));
+  VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &this->getCurrentFrame()->_renderFence->_handle, true, 1000000000));
 
-  this->getCurrentFrame()._deletionQueue.flush();
-  this->getCurrentFrame()._frameDescriptors.clearPools(_device->getHandle());
+  this->getCurrentFrame()->_deletionQueue.flush();
+  this->getCurrentFrame()->_frameDescriptors.clearPools(_device->getHandle());
   //request image from the swapchain
   uint32_t swapchainImageIndex;
 
@@ -181,7 +181,7 @@ void VkEngine::draw()
     _device->getHandle(),
     _swapchain->getHandle(),
     1000000000,
-    this->getCurrentFrame()._swapchainSemaphore,
+    this->getCurrentFrame()->_swapchainSemaphore->_handle,
     nullptr,
     &swapchainImageIndex);
   if (e == VK_ERROR_OUT_OF_DATE_KHR)
@@ -194,13 +194,13 @@ void VkEngine::draw()
     std::min(_swapchain->getSwapchainExtent().height, _drawImage->_handle.imageExtent.height) * renderScale;
   _drawExtent.width = std::min(_swapchain->getSwapchainExtent().width, _drawImage->_handle.imageExtent.width) * renderScale;
 
-  VK_CHECK(vkResetFences(_device->getHandle(), 1, &this->getCurrentFrame()._renderFence));
+  VK_CHECK(vkResetFences(_device->getHandle(), 1, &this->getCurrentFrame()->_renderFence->_handle));
 
   //now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
-  VK_CHECK(vkResetCommandBuffer(this->getCurrentFrame()._mainCommandBuffer, 0));
+  VK_CHECK(vkResetCommandBuffer(this->getCurrentFrame()->_mainCommandBuffer->getHandle(), 0));
 
   //naming it cmd for shorter writing
-  VkCommandBuffer cmd = this->getCurrentFrame()._mainCommandBuffer;
+  VkCommandBuffer cmd = this->getCurrentFrame()->_mainCommandBuffer->getHandle();
 
   //begin the command buffer recording. We will use this command buffer exactly once, so we want to let vulkan know that
   VkCommandBufferBeginInfo cmdBeginInfo = vkinit::commandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -262,15 +262,15 @@ void VkEngine::draw()
   VkCommandBufferSubmitInfo cmdinfo = vkinit::commandBufferSubmitInfo(cmd);
 
   VkSemaphoreSubmitInfo waitInfo = vkinit::semaphoreSubmitInfo(
-    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, this->getCurrentFrame()._swapchainSemaphore);
+    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, this->getCurrentFrame()->_swapchainSemaphore->_handle);
   VkSemaphoreSubmitInfo signalInfo =
-    vkinit::semaphoreSubmitInfo(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, this->getCurrentFrame()._renderSemaphore);
+    vkinit::semaphoreSubmitInfo(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, this->getCurrentFrame()->_renderSemaphore->_handle);
 
   VkSubmitInfo2 submit = vkinit::submitInfo(&cmdinfo, &signalInfo, &waitInfo);
 
   //submit command buffer to the queue and execute it.
   // _renderFence will now block until the graphic commands finish execdution
-  VK_CHECK(vkQueueSubmit2(_device->getGraphicsQueue(), 1, &submit, this->getCurrentFrame()._renderFence));
+  VK_CHECK(vkQueueSubmit2(_device->getGraphicsQueue(), 1, &submit, this->getCurrentFrame()->_renderFence->_handle));
 
 
   //prepare present
@@ -281,7 +281,7 @@ void VkEngine::draw()
   presentInfo.pSwapchains = &(_swapchain->_vkbHandle.swapchain);
   presentInfo.swapchainCount = 1;
 
-  presentInfo.pWaitSemaphores = &this->getCurrentFrame()._renderSemaphore;
+  presentInfo.pWaitSemaphores = &(this->getCurrentFrame()->_renderSemaphore->_handle);
   presentInfo.waitSemaphoreCount = 1;
 
   presentInfo.pImageIndices = &swapchainImageIndex;
@@ -318,7 +318,7 @@ void VkEngine::drawBackground(VkCommandBuffer cmd)
 
   // bind the descriptor set containing the draw image for the compute pipeline
   vkCmdBindDescriptorSets(
-    cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors, 0, nullptr);
+    cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors->_handle, 0, nullptr);
 
   vkCmdPushConstants(
     cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
@@ -377,7 +377,7 @@ void VkEngine::drawGeometry(VkCommandBuffer cmd)
     this->createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
   //add it to the deletion queue of this frame so it gets deleted once its been used
-  this->getCurrentFrame()._deletionQueue.push([=, this]() { this->destroyBuffer(gpuSceneDataBuffer); });
+  this->getCurrentFrame()->_deletionQueue.push([=, this]() { this->destroyBuffer(gpuSceneDataBuffer); });
 
   //write the buffer
   GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
@@ -385,7 +385,7 @@ void VkEngine::drawGeometry(VkCommandBuffer cmd)
 
   //create a descriptor set that binds that buffer and update it
   VkDescriptorSet globalDescriptor =
-    this->getCurrentFrame()._frameDescriptors.allocate(_device->getHandle(), _gpuSceneDataDescriptorLayout);
+    this->getCurrentFrame()->_frameDescriptors.allocate(_device->getHandle(), _gpuSceneDataDescriptorLayout->_handle);
 
   DescriptorWriter writer;
   writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
@@ -479,7 +479,7 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
 
   // bind the descriptor set containing the draw image for the compute pipeline
   vkCmdBindDescriptorSets(
-    cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors, 0, nullptr);
+    cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors->_handle, 0, nullptr);
 
   vkCmdPushConstants(
     cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
@@ -660,10 +660,10 @@ void VkEngine::run()
 //--------------------------------------------------------------------------------------------------
 void VkEngine::immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function)
 {
-  VK_CHECK(vkResetFences(_device->getHandle(), 1, &_immFence));
-  VK_CHECK(vkResetCommandBuffer(_immCommandBuffer, 0));
+  VK_CHECK(vkResetFences(_device->getHandle(), 1, &_immFence->_handle));
+  VK_CHECK(vkResetCommandBuffer(_immCommandBuffer->getHandle(), 0));
 
-  VkCommandBuffer cmd = _immCommandBuffer;
+  VkCommandBuffer cmd = _immCommandBuffer->getHandle();
 
   VkCommandBufferBeginInfo cmdBeginInfo = vkinit::commandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -678,9 +678,9 @@ void VkEngine::immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& functi
 
   // submit command buffer to the queue and execute it.
   //  _renderFence will now block until the graphic commands finish execution
-  VK_CHECK(vkQueueSubmit2(_device->getGraphicsQueue(), 1, &submit, _immFence));
+  VK_CHECK(vkQueueSubmit2(_device->getGraphicsQueue(), 1, &submit, _immFence->_handle));
 
-  VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &_immFence, true, 9999999999));
+  VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &_immFence->_handle, true, 9999999999));
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -704,53 +704,23 @@ void VkEngine::initSwapchain()
 }
 
 //--------------------------------------------------------------------------------------------------
-void VkEngine::initCommands()
+void VkEngine::initFrameData()
 {
-  //create a command pool for commands submitted to the graphics queue.
-  //we also want the pool to allow for resetting of individual command buffers
-  VkCommandPoolCreateInfo commandPoolInfo =
-    vkinit::commandPoolCreateInfo(_device->getGraphicsQueueFamily(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-
   for (int i = 0; i < FRAME_OVERLAP; i++)
   {
-    VK_CHECK(vkCreateCommandPool(_device->getHandle(), &commandPoolInfo, nullptr, &_frames[i]._commandPool));
-
-    // allocate the default command buffer that we will use for rendering
-    VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::commandBufferAllocateInfo(_frames[i]._commandPool, 1);
-
-    VK_CHECK(vkAllocateCommandBuffers(_device->getHandle(), &cmdAllocInfo, &_frames[i]._mainCommandBuffer));
+    _frames.push_back(std::make_unique<FrameData>(_device));
+    _deletionQueue.push([&, i]() { _frames[i]->_frameDescriptors.destroyPools(_device->getHandle()); });
   }
-
-  VK_CHECK(vkCreateCommandPool(_device->getHandle(), &commandPoolInfo, nullptr, &_immCommandPool));
-
-  // allocate the command buffer for immediate submits
-  VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::commandBufferAllocateInfo(_immCommandPool, 1);
-
-  VK_CHECK(vkAllocateCommandBuffers(_device->getHandle(), &cmdAllocInfo, &_immCommandBuffer));
-
-  _deletionQueue.push([=]() { vkDestroyCommandPool(_device->getHandle(), _immCommandPool, nullptr); });
 }
 
 //--------------------------------------------------------------------------------------------------
-void VkEngine::initSyncStructures()
+void VkEngine::initImmediateCommands()
 {
-  //create syncronization structures
-  //one fence to control when the gpu has finished rendering the frame,
-  //and 2 semaphores to syncronize rendering with swapchain
-  //we want the fence to start signalled so we can wait on it on the first frame
-  VkFenceCreateInfo fenceCreateInfo = vkinit::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
-  VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphoreCreateInfo();
-
-  for (int i = 0; i < FRAME_OVERLAP; i++)
-  {
-    VK_CHECK(vkCreateFence(_device->getHandle(), &fenceCreateInfo, nullptr, &_frames[i]._renderFence));
-
-    VK_CHECK(vkCreateSemaphore(_device->getHandle(), &semaphoreCreateInfo, nullptr, &_frames[i]._swapchainSemaphore));
-    VK_CHECK(vkCreateSemaphore(_device->getHandle(), &semaphoreCreateInfo, nullptr, &_frames[i]._renderSemaphore));
-  }
-
-  VK_CHECK(vkCreateFence(_device->getHandle(), &fenceCreateInfo, nullptr, &_immFence));
-  _deletionQueue.push([=]() { vkDestroyFence(_device->getHandle(), _immFence, nullptr); });
+  _immCommandPool = std::make_unique<CommandPool>(_device);
+  _immCommandBuffer = std::make_unique<CommandBuffer>(_device, _immCommandPool);
+  _deletionQueue.push([=]() { vkDestroyCommandPool(_device->getHandle(), _immCommandPool->getHandle(), nullptr); });
+  _immFence = std::make_unique<Fence>(_device);
+  _deletionQueue.push([=]() { vkDestroyFence(_device->getHandle(), _immFence->_handle, nullptr); });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -765,65 +735,29 @@ void VkEngine::initDescriptors()
   _globalDescriptorAllocator.init(_device->getHandle(), 10, sizes);
 
   //make the descriptor set layout for our compute draw
-  {
-    DescriptorLayoutBuilder builder;
-    builder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    _drawImageDescriptorLayout = builder.build(_device->getHandle(), VK_SHADER_STAGE_COMPUTE_BIT);
-  }
+  _drawImageDescriptorLayout =
+    std::make_unique<DescriptorSetLayout>(_device, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 
   //make the descriptor set layout for our default texture image
-  {
-    DescriptorLayoutBuilder builder;
-    builder.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    _singleImageDescriptorLayout = builder.build(_device->getHandle(), VK_SHADER_STAGE_FRAGMENT_BIT);
-  }
+  _singleImageDescriptorLayout =
+    std::make_unique<DescriptorSetLayout>(_device, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-  //make the descriptor set layout for our gpu scene
-  {
-    DescriptorLayoutBuilder builder;
-    builder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    _gpuSceneDataDescriptorLayout =
-      builder.build(_device->getHandle(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-  }
-
+  _gpuSceneDataDescriptorLayout = std::make_unique<DescriptorSetLayout>(
+    _device, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
   //allocate a descriptor set for our draw image
-  _drawImageDescriptors = _globalDescriptorAllocator.allocate(_device->getHandle(), _drawImageDescriptorLayout);
-
-  {
-    DescriptorWriter writer;
-    writer.writeImage(
-      0, _drawImage->_handle.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-
-    writer.updateSet(_device->getHandle(), _drawImageDescriptors);
-  }
+  _drawImageDescriptors = std::make_unique<DescriptorSet>(_device, _drawImageDescriptorLayout, _globalDescriptorAllocator);
+  _drawImageDescriptors->writeImage(_device, _drawImage);
 
   //make sure both the descriptor allocator and the new layout get cleaned up properly
   _deletionQueue.push(
     [&]()
     {
-      _globalDescriptorAllocator.destroyPools(_device->getHandle());
-      vkDestroyDescriptorSetLayout(_device->getHandle(), _drawImageDescriptorLayout, nullptr);
-      vkDestroyDescriptorSetLayout(_device->getHandle(), _singleImageDescriptorLayout, nullptr);
-      vkDestroyDescriptorSetLayout(_device->getHandle(), _gpuSceneDataDescriptorLayout, nullptr);
+      _drawImageDescriptors->destroyPools(_device);
+      vkDestroyDescriptorSetLayout(_device->getHandle(), _drawImageDescriptorLayout->_handle, nullptr);
+      vkDestroyDescriptorSetLayout(_device->getHandle(), _singleImageDescriptorLayout->_handle, nullptr);
+      vkDestroyDescriptorSetLayout(_device->getHandle(), _gpuSceneDataDescriptorLayout->_handle, nullptr);
     });
-
-
-  for (int i = 0; i < FRAME_OVERLAP; i++)
-  {
-    // create a descriptor pool
-    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
-      {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
-    };
-
-    _frames[i]._frameDescriptors = DescriptorAllocatorGrowable{};
-    _frames[i]._frameDescriptors.init(_device->getHandle(), 1000, frame_sizes);
-
-    _deletionQueue.push([&, i]() { _frames[i]._frameDescriptors.destroyPools(_device->getHandle()); });
-  }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -831,7 +765,7 @@ void VkEngine::initPipelines()
 {
   this->initBackgroundPipelines();
   _metalRoughMaterial.buildPipelines(
-    _device->getHandle(), _gpuSceneDataDescriptorLayout, _drawImage->_handle, _depthImage->_handle);
+    _device->getHandle(), _gpuSceneDataDescriptorLayout->_handle, _drawImage->_handle, _depthImage->_handle);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -840,7 +774,7 @@ void VkEngine::initBackgroundPipelines()
   VkPipelineLayoutCreateInfo computeLayout{};
   computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   computeLayout.pNext = nullptr;
-  computeLayout.pSetLayouts = &_drawImageDescriptorLayout;
+  computeLayout.pSetLayouts = &_drawImageDescriptorLayout->_handle;
   computeLayout.setLayoutCount = 1;
 
   VkPushConstantRange pushConstant{};
@@ -949,7 +883,7 @@ void VkEngine::initMeshPipeline()
   VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipelineLayoutCreateInfo();
   pipelineLayoutInfo.pPushConstantRanges = &bufferRange;
   pipelineLayoutInfo.pushConstantRangeCount = 1;
-  pipelineLayoutInfo.pSetLayouts = &_singleImageDescriptorLayout;
+  pipelineLayoutInfo.pSetLayouts = &_singleImageDescriptorLayout->_handle;
   pipelineLayoutInfo.setLayoutCount = 1;
   VK_CHECK(vkCreatePipelineLayout(_device->getHandle(), &pipelineLayoutInfo, nullptr, &_meshPipelineLayout));
 

@@ -33,6 +33,8 @@ Each descriptor set has a cost, the less we have the better.
 
 To sample a texture we can either have 2 descriptors with one for the sampler and one for the sampled image or a single one that combines both but is less efficient. It is harder to deal with 2 descriptors so for now we will have a single one that combine both. May be improved later.
 
+I could also further refactor them, to remove all VkDescriptors elements.
+
 ## Push constants
 
 Allows to bind a very small amount of data to the shaders, fast, but its also very limited in space and must be written as you encode the commands. its main use is that you can give it some per-object data, if your objects dont need much of it, but according to gpu vendors, their best use case is to send some indexes to the shader to be used to access some bigger data buffers.
