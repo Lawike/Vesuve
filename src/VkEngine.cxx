@@ -19,6 +19,7 @@
 #include <set>
 #include <thread>
 #include "DebugUtils.hpp"
+#include "PipelineLayout.hpp"
 #include "UserInterface.hpp"
 #include "VkDescriptors.hpp"
 #include "VkEngine.hpp"
@@ -311,17 +312,24 @@ void VkEngine::drawBackground(VkCommandBuffer cmd)
 
   VkImageSubresourceRange clearRange = vkinit::imageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
 
-  ComputeEffect& effect = _backgroundEffects[_currentBackgroundEffect];
+  ComputeEffect& effect = *_backgroundEffects[_currentBackgroundEffect];
 
   // bind the background compute pipeline
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
 
   // bind the descriptor set containing the draw image for the compute pipeline
   vkCmdBindDescriptorSets(
-    cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors->_handle, 0, nullptr);
+    cmd,
+    VK_PIPELINE_BIND_POINT_COMPUTE,
+    _gradientPipelineLayout->_handle,
+    0,
+    1,
+    &_drawImageDescriptors->_handle,
+    0,
+    nullptr);
 
   vkCmdPushConstants(
-    cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
+    cmd, _gradientPipelineLayout->_handle, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
   // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
   vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
 }
@@ -472,17 +480,24 @@ void VkEngine::drawGeometry(VkCommandBuffer cmd)
 //--------------------------------------------------------------------------------------------------
 void VkEngine::drawMain(VkCommandBuffer cmd)
 {
-  ComputeEffect& effect = _backgroundEffects[_currentBackgroundEffect];
+  ComputeEffect* effect = _backgroundEffects[_currentBackgroundEffect];
 
   // bind the background compute pipeline
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect->pipeline);
 
   // bind the descriptor set containing the draw image for the compute pipeline
   vkCmdBindDescriptorSets(
-    cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors->_handle, 0, nullptr);
+    cmd,
+    VK_PIPELINE_BIND_POINT_COMPUTE,
+    _gradientPipelineLayout->_handle,
+    0,
+    1,
+    &_drawImageDescriptors->_handle,
+    0,
+    nullptr);
 
   vkCmdPushConstants(
-    cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
+    cmd, _gradientPipelineLayout->_handle, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect->data);
   // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
   vkCmdDispatch(cmd, std::ceil(_windowExtent.width / 16.0), std::ceil(_windowExtent.height / 16.0), 1);
 
@@ -771,84 +786,36 @@ void VkEngine::initPipelines()
 //--------------------------------------------------------------------------------------------------
 void VkEngine::initBackgroundPipelines()
 {
-  VkPipelineLayoutCreateInfo computeLayout{};
-  computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  computeLayout.pNext = nullptr;
-  computeLayout.pSetLayouts = &_drawImageDescriptorLayout->_handle;
-  computeLayout.setLayoutCount = 1;
-
   VkPushConstantRange pushConstant{};
   pushConstant.offset = 0;
   pushConstant.size = sizeof(ComputePushConstants);
   pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+  std::vector<VkPushConstantRange> pushConstants;
+  pushConstants.push_back(pushConstant);
 
-  computeLayout.pPushConstantRanges = &pushConstant;
-  computeLayout.pushConstantRangeCount = 1;
+  _gradientPipelineLayout = std::make_unique<PipelineLayout>(_device, _drawImageDescriptorLayout, pushConstants);
 
-  VK_CHECK(vkCreatePipelineLayout(_device->getHandle(), &computeLayout, nullptr, &_gradientPipelineLayout));
-  VkShaderModule gradientShader;
-  if (!vkutil::loadShaderModule("../shaders/gradient_color.comp.spv", _device->getHandle(), &gradientShader))
-  {
-    fmt::print("Error when building the compute shader \n");
-  }
+  _gradientPipeline =
+    std::make_unique<ComputePipeline>(_device, _gradientPipelineLayout, "../shaders/gradient_color.comp.spv", "gradient");
+  _gradientPipeline->_effect.data.data1 = glm::vec4(1, 0, 0, 1);
+  _gradientPipeline->_effect.data.data2 = glm::vec4(0, 0, 1, 1);
 
-  VkShaderModule skyShader;
-  if (!vkutil::loadShaderModule("../shaders/sky.comp.spv", _device->getHandle(), &skyShader))
-  {
-    fmt::print("Error when building the compute shader \n");
-  }
-
-  VkPipelineShaderStageCreateInfo stageinfo{};
-  stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  stageinfo.pNext = nullptr;
-  stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-  stageinfo.module = gradientShader;
-  stageinfo.pName = "main";
-
-  VkComputePipelineCreateInfo computePipelineCreateInfo{};
-  computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-  computePipelineCreateInfo.pNext = nullptr;
-  computePipelineCreateInfo.layout = _gradientPipelineLayout;
-  computePipelineCreateInfo.stage = stageinfo;
-
-  ComputeEffect gradient;
-  gradient.layout = _gradientPipelineLayout;
-  gradient.name = "gradient";
-  gradient.data = {};
-
-  //default colors
-  gradient.data.data1 = glm::vec4(1, 0, 0, 1);
-  gradient.data.data2 = glm::vec4(0, 0, 1, 1);
-
-  VK_CHECK(vkCreateComputePipelines(
-    _device->getHandle(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &gradient.pipeline));
-
-  //change the shader module only to create the sky shader
-  computePipelineCreateInfo.stage.module = skyShader;
-
-  ComputeEffect sky;
-  sky.layout = _gradientPipelineLayout;
-  sky.name = "sky";
-  sky.data = {};
-  //default sky parameters
-  sky.data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
-
-  VK_CHECK(
-    vkCreateComputePipelines(_device->getHandle(), VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &sky.pipeline));
+  _skyPipeline = std::make_unique<ComputePipeline>(_device, _gradientPipelineLayout, "../shaders/sky.comp.spv", "sky");
+  _skyPipeline->_effect.data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
 
   //add the 2 background effects into the array
-  _backgroundEffects.push_back(gradient);
-  _backgroundEffects.push_back(sky);
+  _backgroundEffects.push_back(&_gradientPipeline->_effect);
+  _backgroundEffects.push_back(&_skyPipeline->_effect);
 
   //destroy structures properly
-  vkDestroyShaderModule(_device->getHandle(), gradientShader, nullptr);
-  vkDestroyShaderModule(_device->getHandle(), skyShader, nullptr);
+  vkDestroyShaderModule(_device->getHandle(), _gradientPipeline->_shader, nullptr);
+  vkDestroyShaderModule(_device->getHandle(), _skyPipeline->_shader, nullptr);
   _deletionQueue.push(
     [=]()
     {
-      vkDestroyPipelineLayout(_device->getHandle(), _gradientPipelineLayout, nullptr);
-      vkDestroyPipeline(_device->getHandle(), sky.pipeline, nullptr);
-      vkDestroyPipeline(_device->getHandle(), gradient.pipeline, nullptr);
+      vkDestroyPipelineLayout(_device->getHandle(), _gradientPipelineLayout->_handle, nullptr);
+      vkDestroyPipeline(_device->getHandle(), _gradientPipeline->_handle, nullptr);
+      vkDestroyPipeline(_device->getHandle(), _skyPipeline->_handle, nullptr);
     });
 }
 

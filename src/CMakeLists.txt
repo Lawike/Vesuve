@@ -61,6 +61,10 @@ add_executable(
     "DescriptorSetLayout.hpp"
     "DescriptorSet.cxx"
     "DescriptorSet.hpp"
+    "PipelineLayout.cxx"
+    "PipelineLayout.hpp"
+    "ComputePipeline.cxx"
+    "ComputePipeline.hpp"
 )
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)

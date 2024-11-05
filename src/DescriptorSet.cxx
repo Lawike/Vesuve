@@ -6,7 +6,6 @@ VulkanBackend::DescriptorSet::DescriptorSet(
   std::unique_ptr<DescriptorSetLayout>& layout,
   DescriptorAllocatorGrowable& allocator)
 {
-
   _allocator = &allocator;
   _handle = _allocator->allocate(device->getHandle(), layout->_handle);
 }

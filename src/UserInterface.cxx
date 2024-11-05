@@ -37,7 +37,7 @@ void UserInterface::displayBackground(VkEngine* engine)
   if (ImGui::Begin("background"))
   {
     ImGui::SliderFloat("Render Scale", &engine->renderScale, 0.3f, 1.f);
-    ComputeEffect& selected = engine->_backgroundEffects[engine->_currentBackgroundEffect];
+    ComputeEffect& selected = *engine->_backgroundEffects[engine->_currentBackgroundEffect];
 
     ImGui::Text("Selected effect: ", selected.name);
 

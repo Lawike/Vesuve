@@ -2,6 +2,7 @@
 
 #include <VkBootstrap.h>
 #include "Camera.hpp"
+#include "ComputePipeline.hpp"
 #include "DescriptorSet.hpp"
 #include "DescriptorSetLayout.hpp"
 #include "Device.hpp"
@@ -43,24 +44,6 @@ struct MeshNode : public Node
   std::shared_ptr<MeshAsset> mesh;
 
   virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
-};
-
-struct ComputePushConstants
-{
-  glm::vec4 data1;
-  glm::vec4 data2;
-  glm::vec4 data3;
-  glm::vec4 data4;
-};
-
-struct ComputeEffect
-{
-  const char* name;
-
-  VkPipeline pipeline;
-  VkPipelineLayout layout;
-
-  ComputePushConstants data;
 };
 
 struct EngineStats
@@ -126,15 +109,17 @@ class VkEngine
   std::unique_ptr<DescriptorSet> _drawImageDescriptors;
   std::unique_ptr<DescriptorSetLayout> _drawImageDescriptorLayout;
 
-  VkPipeline _gradientPipeline;
-  VkPipelineLayout _gradientPipelineLayout;
+  // Background effects
+  std::unique_ptr<ComputePipeline> _gradientPipeline;
+  std::unique_ptr<PipelineLayout> _gradientPipelineLayout;
+  std::unique_ptr<ComputePipeline> _skyPipeline;
 
   // immediate submit structures
   std::unique_ptr<Fence> _immFence;
   std::unique_ptr<CommandBuffer> _immCommandBuffer;
   std::unique_ptr<CommandPool> _immCommandPool;
 
-  std::vector<ComputeEffect> _backgroundEffects;
+  std::vector<ComputeEffect*> _backgroundEffects;
   int _currentBackgroundEffect{0};
 
   VkPipelineLayout _meshPipelineLayout;
