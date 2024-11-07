@@ -97,26 +97,29 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
   // temporal arrays for all the objects to use while creating the GLTF data
   std::vector<std::shared_ptr<MeshAsset>> meshes;
   std::vector<std::shared_ptr<Node>> nodes;
-  std::vector<AllocatedImage> images;
+  std::vector<std::unique_ptr<VulkanBackend::Image>> images;
+  images.resize(gltf.images.size());
   std::vector<std::shared_ptr<GLTFMaterial>> materials;
 
   // load all textures
+  int i = 0;
   for (fastgltf::Image& image : gltf.images)
   {
-    std::optional<AllocatedImage> img = loadImage(engine, gltf, image);
+    // Need to transfer ownership
+    loadImage(images.at(i), engine, gltf, image);
 
-    if (img.has_value())
+    if (images.at(i)->_handle.image != VK_NULL_HANDLE)
     {
-      images.push_back(*img);
-      file.images[image.name.c_str()] = *img;
+      file.images[image.name.c_str()] = images.at(i)->_handle;
     }
     else
     {
       // we failed to load, so lets give the slot a default white texture to not
       // completely break loading
-      images.push_back(engine->_errorCheckerboardImage);
+      images.at(i) = std::move(engine->_errorCheckerboardImage);
       std::cout << "gltf failed to load texture " << image.name << std::endl;
     }
+    i++;
   }
   // create buffer to hold the material data
   file.materialDataBuffer = engine->createBuffer(
@@ -152,9 +155,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
 
     GLTFMetallicRoughness::MaterialResources materialResources;
     // default the material textures
-    materialResources.colorImage = engine->_whiteImage;
+    materialResources.colorImage = engine->_whiteImage->_handle;
     materialResources.colorSampler = engine->_defaultSamplerLinear;
-    materialResources.metalRoughImage = engine->_whiteImage;
+    materialResources.metalRoughImage = engine->_whiteImage->_handle;
     materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
 
     // set the uniform buffer for the material data
@@ -166,7 +169,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
       size_t img = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].imageIndex.value();
       size_t sampler = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].samplerIndex.value();
 
-      materialResources.colorImage = images[img];
+      materialResources.colorImage = images[img]->_handle;
       materialResources.colorSampler = file.samplers[sampler];
     }
     // build material
@@ -382,7 +385,11 @@ VkSamplerMipmapMode vkloader::extractMipmapMode(fastgltf::Filter filter)
   }
 }
 
-std::optional<AllocatedImage> vkloader::loadImage(VkEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image)
+std::optional<AllocatedImage> vkloader::loadImage(
+  std::unique_ptr<VulkanBackend::Image>& image,
+  VkEngine* engine,
+  fastgltf::Asset& asset,
+  fastgltf::Image& gltfImage)
 {
   AllocatedImage newImage{};
 
@@ -407,7 +414,7 @@ std::optional<AllocatedImage> vkloader::loadImage(VkEngine* engine, fastgltf::As
           imagesize.height = height;
           imagesize.depth = 1;
 
-          newImage = engine->createImage(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+          engine->createImage(image, data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
           stbi_image_free(data);
         }
@@ -428,7 +435,7 @@ std::optional<AllocatedImage> vkloader::loadImage(VkEngine* engine, fastgltf::As
           imagesize.height = height;
           imagesize.depth = 1;
 
-          newImage = engine->createImage(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+          engine->createImage(image, data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
           stbi_image_free(data);
         }
@@ -449,7 +456,7 @@ std::optional<AllocatedImage> vkloader::loadImage(VkEngine* engine, fastgltf::As
           imagesize.height = height;
           imagesize.depth = 1;
 
-          newImage = engine->createImage(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+          engine->createImage(image, data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
           stbi_image_free(data);
         }
@@ -480,8 +487,8 @@ std::optional<AllocatedImage> vkloader::loadImage(VkEngine* engine, fastgltf::As
                                 imagesize.height = height;
                                 imagesize.depth = 1;
 
-                                newImage = engine->createImage(
-                                  data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+                                engine->createImage(
+                                  image, data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
                                 stbi_image_free(data);
                               }
@@ -489,18 +496,14 @@ std::optional<AllocatedImage> vkloader::loadImage(VkEngine* engine, fastgltf::As
           buffer.data);
       },
     },
-    image.data);
+    gltfImage.data);
 
   // if any of the attempts to load the data failed, we havent written the image
   // so handle is null
-  if (newImage.image == VK_NULL_HANDLE)
+  if (image->_handle.image == VK_NULL_HANDLE)
   {
     const char* test = stbi_failure_reason();
     return {};
-  }
-  else
-  {
-    return newImage;
   }
 }
 
@@ -530,7 +533,7 @@ void LoadedGLTF::clearAll()
 
   for (auto& [k, v] : images)
   {
-    if (v.image == creator->_errorCheckerboardImage.image)
+    if (v.image == creator->_errorCheckerboardImage->_handle.image)
     {
       //dont destroy the default images
       continue;

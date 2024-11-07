@@ -15,6 +15,7 @@ struct Stats
 static class UserInterface
 {
  public:
+  static void init(VkEngine* engine);
   static void display(VkEngine* engine);
   static void displayBackground(VkEngine* engine);
   static void displaySceneSelector(VkEngine* engine);

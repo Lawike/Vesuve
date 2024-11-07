@@ -1,6 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <unordered_map>
+#include "Image.hpp"
 #include "VkTypes.hpp"
 #include "fastgltf/types.hpp"
 
@@ -71,5 +72,9 @@ namespace vkloader
   std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VkEngine* engine, std::filesystem::path filePath);
   VkFilter extractFilter(fastgltf::Filter filter);
   VkSamplerMipmapMode extractMipmapMode(fastgltf::Filter filter);
-  std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image);
+  std::optional<AllocatedImage> loadImage(
+    std::unique_ptr<VulkanBackend::Image>& image,
+    VkEngine* engine,
+    fastgltf::Asset& asset,
+    fastgltf::Image& gltfImage);
 }  // namespace vkloader

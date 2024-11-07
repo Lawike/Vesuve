@@ -8,6 +8,74 @@
 #include "VkEngine.hpp"
 
 //--------------------------------------------------------------------------------------------------
+void UserInterface::init(VkEngine* engine)
+{
+  // 1: create descriptor pool for IMGUI
+  //  the size of the pool is very oversize, but it's copied from imgui demo
+  //  itself.
+  VkDescriptorPoolSize pool_sizes[] = {
+    {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+    {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+    {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+    {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+    {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+    {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
+
+  VkDescriptorPoolCreateInfo poolInfo = {};
+  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+  poolInfo.maxSets = 1000;
+  poolInfo.poolSizeCount = (uint32_t)std::size(pool_sizes);
+  poolInfo.pPoolSizes = pool_sizes;
+
+  VkDescriptorPool imguiPool;
+  VK_CHECK(vkCreateDescriptorPool(engine->_device->getHandle(), &poolInfo, nullptr, &imguiPool));
+
+  // 2: initialize imgui library
+
+  // this initializes the core structures of imgui
+  ImGui::CreateContext();
+
+  // this initializes imgui for SDL
+  ImGui_ImplSDL2_InitForVulkan(engine->_window->handle());
+
+  // this initializes imgui for Vulkan
+  ImGui_ImplVulkan_InitInfo initInfo = {};
+  initInfo.Instance = engine->_instance->getHandle();
+  initInfo.PhysicalDevice = engine->_chosenGPU->getHandle();
+  initInfo.Device = engine->_device->getHandle();
+  initInfo.Queue = engine->_device->getGraphicsQueue();
+  initInfo.DescriptorPool = imguiPool;
+  initInfo.MinImageCount = 3;
+  initInfo.ImageCount = 3;
+  initInfo.UseDynamicRendering = true;
+
+  //dynamic rendering parameters for imgui to use
+  initInfo.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+  initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+  initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &engine->_swapchain->_swapchainImageFormat;
+
+  initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+  ImGui_ImplVulkan_Init(&initInfo);
+
+  ImGui_ImplVulkan_CreateFontsTexture();
+
+  // add the destroy the imgui created structures
+  engine->_deletionQueue.push(
+    [=]()
+    {
+      ImGui_ImplVulkan_Shutdown();
+      vkDestroyDescriptorPool(engine->_device->getHandle(), imguiPool, nullptr);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
 void UserInterface::display(VkEngine* engine)
 {
   // imgui new frame

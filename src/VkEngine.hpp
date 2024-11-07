@@ -134,10 +134,10 @@ class VkEngine
   std::unique_ptr<DescriptorSetLayout> _gpuSceneDataDescriptorLayout;
 
   //Default texture for tests
-  AllocatedImage _whiteImage;
-  AllocatedImage _blackImage;
-  AllocatedImage _greyImage;
-  AllocatedImage _errorCheckerboardImage;
+  std::unique_ptr<Image> _whiteImage;
+  std::unique_ptr<Image> _blackImage;
+  std::unique_ptr<Image> _greyImage;
+  std::unique_ptr<Image> _errorCheckerboardImage;
 
   VkSampler _defaultSamplerLinear;
   VkSampler _defaultSamplerNearest;
@@ -190,8 +190,13 @@ class VkEngine
   AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
   void destroyBuffer(const AllocatedBuffer& buffer);
 
-  AllocatedImage createImage(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
-  AllocatedImage createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+  void createImage(
+    std::unique_ptr<Image>& image,
+    void* data,
+    VkExtent3D size,
+    VkFormat format,
+    VkImageUsageFlags usage,
+    bool mipmapped = false);
   void destroyImage(const AllocatedImage& img);
 
  private:
@@ -202,18 +207,14 @@ class VkEngine
   void initDescriptors();
   void initPipelines();
   void initBackgroundPipelines();
-  void initMeshPipeline();
   void initDefaultData();
   void initMainCamera();
   void initLight();
-  void initImgui();
   void destroySwapchain();
   void resizeSwapchain();
   void createSurface();
   void createMemoryAllocator();
 
   void createDrawImage();
-  void createDrawImageView();
   void createDepthImage();
-  void createDepthImageView();
 };

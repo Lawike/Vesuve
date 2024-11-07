@@ -1,15 +1,21 @@
 #pragma once
 
-#include "VkTypes.hpp"
+#include "Device.hpp"
 
 namespace VulkanBackend
 {
   class Image
   {
    public:
-    Image(VkExtent2D _windowExtent, VkFormat imageFormat, VkImageUsageFlags usage, VmaAllocator allocator);
+    Image(
+      std::unique_ptr<Device>& device,
+      VkExtent3D imageExtent,
+      VkFormat imageFormat,
+      VkImageUsageFlags usage,
+      VmaAllocator allocator,
+      bool mipmapped);
+    ~Image() = default;
 
     AllocatedImage _handle{};
-   private:
   };
 }  // namespace VulkanBackend

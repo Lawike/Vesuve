@@ -100,7 +100,7 @@ void VkEngine::init()
   this->initImmediateCommands();
   this->initDescriptors();
   this->initPipelines();
-  this->initImgui();
+  UserInterface::init(this);
   this->initDefaultData();
   this->initMainCamera();
   this->initLight();
@@ -713,9 +713,7 @@ void VkEngine::initSwapchain()
 {
   _swapchain = std::make_unique<Swapchain>(_chosenGPU, _device, _surface, _windowExtent.width, _windowExtent.height);
   this->createDrawImage();
-  this->createDrawImageView();
   this->createDepthImage();
-  this->createDepthImageView();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -820,90 +818,18 @@ void VkEngine::initBackgroundPipelines()
 }
 
 //--------------------------------------------------------------------------------------------------
-void VkEngine::initMeshPipeline()
-{
-  VkShaderModule triangleFragShader;
-  if (!vkutil::loadShaderModule("../shaders/tex_image.frag.spv", _device->getHandle(), &triangleFragShader))
-  {
-    fmt::print("Error when building the triangle fragment shader module");
-  }
-  else
-  {
-    fmt::print("Triangle fragment shader succesfully loaded");
-  }
-
-  VkShaderModule triangleVertexShader;
-  if (!vkutil::loadShaderModule("../shaders/colored_triangle_mesh.vert.spv", _device->getHandle(), &triangleVertexShader))
-  {
-    fmt::print("Error when building the triangle vertex shader module");
-  }
-  else
-  {
-    fmt::print("Triangle vertex shader succesfully loaded");
-  }
-
-  VkPushConstantRange bufferRange{};
-  bufferRange.offset = 0;
-  bufferRange.size = sizeof(GPUDrawPushConstants);
-  bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-  VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipelineLayoutCreateInfo();
-  pipelineLayoutInfo.pPushConstantRanges = &bufferRange;
-  pipelineLayoutInfo.pushConstantRangeCount = 1;
-  pipelineLayoutInfo.pSetLayouts = &_singleImageDescriptorLayout->_handle;
-  pipelineLayoutInfo.setLayoutCount = 1;
-  VK_CHECK(vkCreatePipelineLayout(_device->getHandle(), &pipelineLayoutInfo, nullptr, &_meshPipelineLayout));
-
-  PipelineBuilder pipelineBuilder;
-
-  //use the triangle layout we created
-  pipelineBuilder._pipelineLayout = _meshPipelineLayout;
-  //connecting the vertex and pixel shaders to the pipeline
-  pipelineBuilder.setShaders(triangleVertexShader, triangleFragShader);
-  //it will draw triangles
-  pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  //filled triangles
-  pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-  //no backface culling
-  pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-  //no multisampling
-  pipelineBuilder.setMultisamplingNone();
-  //no blending
-  pipelineBuilder.enableBlendingAlphablend();
-
-  pipelineBuilder.enableDepthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-  //connect the image format we will draw into, from draw image
-  pipelineBuilder.setColorAttachmentFormat(_drawImage->_handle.imageFormat);
-  pipelineBuilder.setDepthFormat(_depthImage->_handle.imageFormat);
-
-  //finally build the pipeline
-  _meshPipeline = pipelineBuilder.buildPipeline(_device->getHandle());
-
-  //clean structures
-  vkDestroyShaderModule(_device->getHandle(), triangleFragShader, nullptr);
-  vkDestroyShaderModule(_device->getHandle(), triangleVertexShader, nullptr);
-
-  _deletionQueue.push(
-    [&]()
-    {
-      vkDestroyPipelineLayout(_device->getHandle(), _meshPipelineLayout, nullptr);
-      vkDestroyPipeline(_device->getHandle(), _meshPipeline, nullptr);
-    });
-}
-
-//--------------------------------------------------------------------------------------------------
 void VkEngine::initDefaultData()
 {
   //3 default textures, white, grey, black. 1 pixel each
   uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
-  _whiteImage = createImage((void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  createImage(_whiteImage, (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
   uint32_t grey = glm::packUnorm4x8(glm::vec4(0.66f, 0.66f, 0.66f, 1));
-  _greyImage = createImage((void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  createImage(_greyImage, (void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
   uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
-  _blackImage = createImage((void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  createImage(_blackImage, (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
   //checkerboard image
   uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
@@ -915,8 +841,8 @@ void VkEngine::initDefaultData()
       pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
     }
   }
-  _errorCheckerboardImage =
-    this->createImage(pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  createImage(
+    _errorCheckerboardImage, pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
   VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 
@@ -935,17 +861,17 @@ void VkEngine::initDefaultData()
       vkDestroySampler(_device->getHandle(), _defaultSamplerNearest, nullptr);
       vkDestroySampler(_device->getHandle(), _defaultSamplerLinear, nullptr);
 
-      this->destroyImage(_whiteImage);
-      this->destroyImage(_greyImage);
-      this->destroyImage(_blackImage);
-      this->destroyImage(_errorCheckerboardImage);
+      this->destroyImage(_whiteImage->_handle);
+      this->destroyImage(_greyImage->_handle);
+      this->destroyImage(_blackImage->_handle);
+      this->destroyImage(_errorCheckerboardImage->_handle);
     });
 
   GLTFMetallicRoughness::MaterialResources materialResources;
   //default the material textures
-  materialResources.colorImage = _whiteImage;
+  materialResources.colorImage = _whiteImage->_handle;
   materialResources.colorSampler = _defaultSamplerLinear;
-  materialResources.metalRoughImage = _whiteImage;
+  materialResources.metalRoughImage = _whiteImage->_handle;
   materialResources.metalRoughSampler = _defaultSamplerLinear;
 
   //set the uniform buffer for the material data
@@ -1007,74 +933,6 @@ void VkEngine::initLight()
 }
 
 //--------------------------------------------------------------------------------------------------
-void VkEngine::initImgui()
-{
-  // 1: create descriptor pool for IMGUI
-  //  the size of the pool is very oversize, but it's copied from imgui demo
-  //  itself.
-  VkDescriptorPoolSize pool_sizes[] = {
-    {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-    {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-    {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-    {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-    {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-    {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
-
-  VkDescriptorPoolCreateInfo poolInfo = {};
-  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-  poolInfo.maxSets = 1000;
-  poolInfo.poolSizeCount = (uint32_t)std::size(pool_sizes);
-  poolInfo.pPoolSizes = pool_sizes;
-
-  VkDescriptorPool imguiPool;
-  VK_CHECK(vkCreateDescriptorPool(_device->getHandle(), &poolInfo, nullptr, &imguiPool));
-
-  // 2: initialize imgui library
-
-  // this initializes the core structures of imgui
-  ImGui::CreateContext();
-
-  // this initializes imgui for SDL
-  ImGui_ImplSDL2_InitForVulkan(_window->handle());
-
-  // this initializes imgui for Vulkan
-  ImGui_ImplVulkan_InitInfo initInfo = {};
-  initInfo.Instance = _instance->getHandle();
-  initInfo.PhysicalDevice = _chosenGPU->getHandle();
-  initInfo.Device = _device->getHandle();
-  initInfo.Queue = _device->getGraphicsQueue();
-  initInfo.DescriptorPool = imguiPool;
-  initInfo.MinImageCount = 3;
-  initInfo.ImageCount = 3;
-  initInfo.UseDynamicRendering = true;
-
-  //dynamic rendering parameters for imgui to use
-  initInfo.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-  initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-  initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &_swapchain->_swapchainImageFormat;
-
-  initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-
-  ImGui_ImplVulkan_Init(&initInfo);
-
-  ImGui_ImplVulkan_CreateFontsTexture();
-
-  // add the destroy the imgui created structures
-  _deletionQueue.push(
-    [=]()
-    {
-      ImGui_ImplVulkan_Shutdown();
-      vkDestroyDescriptorPool(_device->getHandle(), imguiPool, nullptr);
-    });
-}
-
-//--------------------------------------------------------------------------------------------------
 void VkEngine::destroySwapchain()
 {
   vkDestroySwapchainKHR(_device->getHandle(), _swapchain->getHandle(), nullptr);
@@ -1129,58 +987,26 @@ void VkEngine::createMemoryAllocator()
 }
 
 //--------------------------------------------------------------------------------------------------
-AllocatedImage VkEngine::createImage(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
-{
-  AllocatedImage newImage;
-  newImage.imageFormat = format;
-  newImage.imageExtent = size;
-
-  VkImageCreateInfo img_info = vkinit::imageCreateInfo(format, usage, size);
-  if (mipmapped)
-  {
-    img_info.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(size.width, size.height)))) + 1;
-  }
-
-  // always allocate images on dedicated GPU memory
-  VmaAllocationCreateInfo allocinfo = {};
-  allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-  allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-  // allocate and create the image
-  VK_CHECK(vmaCreateImage(_allocator, &img_info, &allocinfo, &newImage.image, &newImage.allocation, nullptr));
-
-  // if the format is a depth format, we will need to have it use the correct
-  // aspect flag
-  VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
-  if (format == VK_FORMAT_D32_SFLOAT)
-  {
-    aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
-  }
-
-  // build a image-view for the image
-  VkImageViewCreateInfo view_info = vkinit::imageViewCreateInfo(format, newImage.image, aspectFlag);
-  view_info.subresourceRange.levelCount = img_info.mipLevels;
-
-  VK_CHECK(vkCreateImageView(_device->getHandle(), &view_info, nullptr, &newImage.imageView));
-
-  return newImage;
-}
-
-//--------------------------------------------------------------------------------------------------
-AllocatedImage VkEngine::createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
+void VkEngine::createImage(
+  std::unique_ptr<Image>& image,
+  void* data,
+  VkExtent3D size,
+  VkFormat format,
+  VkImageUsageFlags usage,
+  bool mipmapped)
 {
   size_t data_size = size.depth * size.width * size.height * 4;
   AllocatedBuffer uploadbuffer = createBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
   memcpy(uploadbuffer.info.pMappedData, data, data_size);
 
-  AllocatedImage new_image =
-    createImage(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
+  image = std::make_unique<Image>(
+    _device, size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, _allocator, mipmapped);
 
   immediateSubmit(
     [&](VkCommandBuffer cmd)
     {
-      vkutil::transitionImage(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+      vkutil::transitionImage(cmd, image->_handle.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
       VkBufferImageCopy copyRegion = {};
       copyRegion.bufferOffset = 0;
@@ -1195,15 +1021,13 @@ AllocatedImage VkEngine::createImage(void* data, VkExtent3D size, VkFormat forma
 
       // copy the buffer into the image
       vkCmdCopyBufferToImage(
-        cmd, uploadbuffer.buffer, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+        cmd, uploadbuffer.buffer, image->_handle.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
       vkutil::transitionImage(
-        cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        cmd, image->_handle.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     });
 
   destroyBuffer(uploadbuffer);
-
-  return new_image;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1225,21 +1049,11 @@ void VkEngine::createDrawImage()
   drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
   drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-  _drawImage = std::make_unique<Image>(_windowExtent, imageFormat, drawImageUsages, _allocator);
+  VkExtent3D imageExtent = {_windowExtent.width, _windowExtent.height, 1};
+
+  _drawImage = std::make_unique<Image>(_device, imageExtent, imageFormat, drawImageUsages, _allocator, false);
 
   _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _drawImage->_handle.image, _drawImage->_handle.allocation); });
-}
-
-//--------------------------------------------------------------------------------------------------
-void VkEngine::createDrawImageView()
-{
-  //build a image-view for the draw image to use for rendering
-  VkImageViewCreateInfo viewInfo =
-    vkinit::imageViewCreateInfo(_drawImage->_handle.imageFormat, _drawImage->_handle.image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-  VK_CHECK(vkCreateImageView(_device->getHandle(), &viewInfo, nullptr, &_drawImage->_handle.imageView));
-
-  //add to deletion queues
   _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _drawImage->_handle.imageView, nullptr); });
 }
 
@@ -1252,19 +1066,11 @@ void VkEngine::createDepthImage()
   VkImageUsageFlags depthImageUsages{};
   depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-  _depthImage = std::make_unique<Image>(_windowExtent, imageFormat, depthImageUsages, _allocator);
+  VkExtent3D imageExtent = {_windowExtent.width, _windowExtent.height, 1};
+
+  _depthImage = std::make_unique<Image>(_device, imageExtent, imageFormat, depthImageUsages, _allocator, false);
+
   _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _depthImage->_handle.image, _depthImage->_handle.allocation); });
-}
-
-//--------------------------------------------------------------------------------------------------
-void VkEngine::createDepthImageView()
-{
-  //build a image-view for the draw image to use for rendering
-  VkImageViewCreateInfo dview_info =
-    vkinit::imageViewCreateInfo(_depthImage->_handle.imageFormat, _depthImage->_handle.image, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-  VK_CHECK(vkCreateImageView(_device->getHandle(), &dview_info, nullptr, &_depthImage->_handle.imageView));
-  //add to deletion queues
   _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _depthImage->_handle.imageView, nullptr); });
 }
 
