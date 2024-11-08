@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <unordered_map>
 #include "Image.hpp"
+#include "VkDescriptors.hpp"
 #include "VkTypes.hpp"
 #include "fastgltf/types.hpp"
 
@@ -77,4 +78,14 @@ namespace vkloader
     VkEngine* engine,
     fastgltf::Asset& asset,
     fastgltf::Image& gltfImage);
+
+  template<typename T> T loadFunction(VkDevice device, const char* funcName)
+  {
+    T func = (T)vkGetDeviceProcAddr(device, funcName);
+    if (!func)
+    {
+      throw std::runtime_error("Failed to load Vulkan function.");
+    }
+    return func;
+  }
 }  // namespace vkloader

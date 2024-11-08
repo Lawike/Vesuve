@@ -65,7 +65,8 @@ add_executable(
     "PipelineLayout.hpp"
     "ComputePipeline.cxx"
     "ComputePipeline.hpp"
-)
+    "RaytracingPipeline.cxx"
+    "RaytracingPipeline.hpp")
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 

@@ -214,7 +214,6 @@ class VkEngine
   void resizeSwapchain();
   void createSurface();
   void createMemoryAllocator();
-
   void createDrawImage();
   void createDepthImage();
 };
