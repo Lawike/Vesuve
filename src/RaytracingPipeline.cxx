@@ -1,6 +1,7 @@
 #include "RaytracingPipeline.hpp"
 #include "VkLoader.hpp"
 #include "VkPipelines.hpp"
+
 //--------------------------------------------------------------------------------------------------
 VulkanBackend::Raytracing::RaytracingPipeline::RaytracingPipeline(
   std::unique_ptr<Device>& device,
@@ -34,9 +35,9 @@ VulkanBackend::Raytracing::RaytracingPipeline::RaytracingPipeline(
   pipelineInfo.basePipelineHandle = nullptr;
   pipelineInfo.basePipelineIndex = 0;
 
-  auto vkCreateRayTracingPipelinesKHR =
+  auto createRayTracingPipelines =
     vkloader::loadFunction<PFN_vkCreateRayTracingPipelinesKHR>(device->getHandle(), "vkCreateRayTracingPipelinesKHR");
-  VK_CHECK(vkCreateRayTracingPipelinesKHR(device->getHandle(), nullptr, nullptr, 1, &pipelineInfo, nullptr, &_handle));
+  VK_CHECK(createRayTracingPipelines(device->getHandle(), nullptr, nullptr, 1, &pipelineInfo, nullptr, &_handle));
 }
 
 //--------------------------------------------------------------------------------------------------

@@ -66,7 +66,12 @@ add_executable(
     "ComputePipeline.cxx"
     "ComputePipeline.hpp"
     "RaytracingPipeline.cxx"
-    "RaytracingPipeline.hpp")
+    "RaytracingPipeline.hpp"
+    "ShaderBindingTable.cxx"
+    "ShaderBindingTable.hpp"
+    "RaytracingProperties.cxx"
+    "RaytracingProperties.hpp"
+)
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 

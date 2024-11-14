@@ -18,6 +18,10 @@ namespace VulkanBackend
         std::string proceduralClosestHitShader,
         std::string proceduralIntersectionShader);
       VkPipeline _handle;
+      uint32_t _raygenGroupIndex;
+      uint32_t _missGroupIndex;
+      uint32_t _triangleHitGroupIndex;
+      uint32_t _proceduralHitGroupIndex;
 
      private:
       void createShaderStages();
@@ -30,10 +34,6 @@ namespace VulkanBackend
       VkShaderModule _closestHitShader;
       VkShaderModule _proceduralClosestHitShader;
       VkShaderModule _proceduralIntersectionShader;
-      uint32_t _raygenGroupIndex;
-      uint32_t _missGroupIndex;
-      uint32_t _triangleHitGroupIndex;
-      uint32_t _proceduralHitGroupIndex;
     };
   }  // namespace Raytracing
 }  // namespace VulkanBackend

@@ -4,9 +4,9 @@
 VulkanBackend::DescriptorSetLayout::DescriptorSetLayout(
   std::unique_ptr<Device>& device,
   VkDescriptorType type,
-  uint32_t flags)
+  uint32_t shaderStages)
 {
   DescriptorLayoutBuilder builder;
   builder.addBinding(0, type);
-  _handle = builder.build(device->getHandle(), flags);
+  _handle = builder.build(device->getHandle(), shaderStages);
 }
