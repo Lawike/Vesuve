@@ -11,15 +11,85 @@ VulkanBackend::DescriptorSet::DescriptorSet(
 }
 
 //--------------------------------------------------------------------------------------------------
-void VulkanBackend::DescriptorSet::writeImage(std::unique_ptr<Device>& device, std::unique_ptr<Image>& image)
+void VulkanBackend::DescriptorSet::writeImage(
+  std::unique_ptr<Device>& device,
+  std::unique_ptr<Image>& image,
+  uint32_t binding)
 {
-  DescriptorWriter writer;
-  writer.writeImage(0, image->_handle.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-  writer.updateSet(device->getHandle(), _handle);
+  VkDescriptorImageInfo& info = _imageInfos.emplace_back(VkDescriptorImageInfo{
+    .sampler = VK_NULL_HANDLE, .imageView = image->_handle.imageView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
+
+  VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+
+  write.dstBinding = binding;
+  write.dstSet = VK_NULL_HANDLE;  //left empty for now until we need to write it
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  write.pImageInfo = &info;
+  write.dstSet = _handle;
+
+  _writes.push_back(write);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VulkanBackend::DescriptorSet::writeBuffer(
+  std::unique_ptr<Device>& device,
+  AllocatedBuffer& buffer,
+  uint32_t binding,
+  size_t size,
+  size_t offset)
+{
+  VkDescriptorBufferInfo& info =
+    _bufferInfos.emplace_back(VkDescriptorBufferInfo{.buffer = buffer.buffer, .offset = offset, .range = size});
+
+  VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+
+  write.dstBinding = binding;
+  write.dstSet = VK_NULL_HANDLE;  //left empty for now until we need to write it
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  write.pBufferInfo = &info;
+  write.dstSet = _handle;
+
+  _writes.push_back(write);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VulkanBackend::DescriptorSet::writeAccelerationStructure(
+  std::unique_ptr<Device>& device,
+  std::unique_ptr<Raytracing::TopLevelAccelerationStructure>& tlas,
+  uint32_t binding)
+{
+  VkWriteDescriptorSetAccelerationStructureKHR descASInfo{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+  descASInfo.accelerationStructureCount = 1;
+  descASInfo.pAccelerationStructures = &tlas->_handle;
+
+  VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  write.dstBinding = binding;
+  write.dstSet = VK_NULL_HANDLE;  //left empty for now until we need to write it
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+  write.dstSet = _handle;
+  write.pNext = &descASInfo;
+
+  _writes.push_back(write);
 }
 
 //--------------------------------------------------------------------------------------------------
 void VulkanBackend::DescriptorSet::destroyPools(std::unique_ptr<Device>& device)
 {
   _allocator->destroyPools(device->getHandle());
+}
+
+//--------------------------------------------------------------------------------------------------
+void VulkanBackend::DescriptorSet::updateSet(std::unique_ptr<Device>& device)
+{
+  vkUpdateDescriptorSets(device->getHandle(), (uint32_t)_writes.size(), _writes.data(), 0, nullptr);
+}
+
+void VulkanBackend::DescriptorSet::clear()
+{
+  _imageInfos.clear();
+  _writes.clear();
+  _bufferInfos.clear();
 }
