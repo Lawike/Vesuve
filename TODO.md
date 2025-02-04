@@ -2,14 +2,14 @@
 
 ## Deletion Queue
 
-std::function stores a lambda, and we can use it to store a callback with some data, which is perfect for this case.
+`std::function` stores a lambda, and we can use it to store a callback with some data, which is perfect for this case.
 
-Doing callbacks like this is inneficient at scale, because we are storing whole std::functions for every object we are deleting, which is not going to be optimal. For the amount of objects we will use in this tutorial, its going to be fine. but if you need to delete thousands of objects and want them deleted faster, a better implementation would be to store arrays of vulkan handles of various types such as VkImage, VkBuffer, and so on. And then delete those from a loop.
+Doing callbacks like this is inneficient at scale, because we are storing whole `std::functions` for every object we are deleting, which is not going to be optimal. For the amount of objects we will use in this tutorial, its going to be fine. but if you need to delete thousands of objects and want them deleted faster, a better implementation would be to store arrays of vulkan handles of various types such as VkImage, VkBuffer, and so on. And then delete those from a loop.
 
 ## Image
 
-- transitionImageLayout
-- copyImageToImage
+- `transitionImageLayout`
+- `copyImageToImage`
   Those two functions are useful when setting up the engine, but later its best to ignore them and write your own version that can do extra logic on a fullscreen fragment shader.
 
 ## Shaders
@@ -21,7 +21,7 @@ Abstract the shader file path with a config file.
 ## Command pools / buffers
 
 GPU vendors advise to reset the command pools and not the command buffers individually.
-So resetting the pool of each frame can be handy to avoid using the VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT flag which can complicate the driver memory management .
+So resetting the pool of each frame can be handy to avoid using the `VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT` flag which can complicate the driver memory management .
 
 Also in the UploadMesh function, we use a staging buffer in which we copy vertex & indices data from the CPU. Currently this pattern is not very efficient, as we are waiting for the GPU command to fully execute before continuing with our CPU side logic. This is something people generally put on a background thread, whose sole job is to execute uploads like this one, and deleting/reusing the staging buffers.
 
