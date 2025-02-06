@@ -38,12 +38,18 @@ VulkanBackend::Raytracing::RaytracingPipeline::RaytracingPipeline(
   auto createRayTracingPipelines =
     vkloader::loadFunction<PFN_vkCreateRayTracingPipelinesKHR>(device->getHandle(), "vkCreateRayTracingPipelinesKHR");
   VK_CHECK(createRayTracingPipelines(device->getHandle(), nullptr, nullptr, 1, &pipelineInfo, nullptr, &_handle));
+
+  vkDestroyShaderModule(device->getHandle(), _raygenShader, nullptr);
+  vkDestroyShaderModule(device->getHandle(), _missShader, nullptr);
+  vkDestroyShaderModule(device->getHandle(), _closestHitShader, nullptr);
+  vkDestroyShaderModule(device->getHandle(), _proceduralClosestHitShader, nullptr);
+  vkDestroyShaderModule(device->getHandle(), _proceduralIntersectionShader, nullptr);
 }
 
 //--------------------------------------------------------------------------------------------------
 void VulkanBackend::Raytracing::RaytracingPipeline::createShaderStages()
 {
-  std::vector<VkPipelineShaderStageCreateInfo> shaderStages = {
+  _shaderStages = {
     createShaderStageInfo(VK_SHADER_STAGE_RAYGEN_BIT_KHR, _raygenShader),
     createShaderStageInfo(VK_SHADER_STAGE_MISS_BIT_KHR, _missShader),
     createShaderStageInfo(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, _closestHitShader),

@@ -20,7 +20,7 @@ namespace VulkanBackend
     void writeBuffer(std::unique_ptr<Device>& device, AllocatedBuffer& buffer, uint32_t binding, size_t size, size_t offset);
     void writeAccelerationStructure(
       std::unique_ptr<Device>& device,
-      std::unique_ptr<Raytracing::TopLevelAccelerationStructure>& tlas,
+      Raytracing::TopLevelAccelerationStructure& tlas,
       uint32_t binding);
     void destroyPools(std::unique_ptr<Device>& device);
     void updateSet(std::unique_ptr<Device>& device);

@@ -130,6 +130,9 @@ struct GPUMeshBuffers
   AllocatedBuffer indexBuffer;
   AllocatedBuffer vertexBuffer;
   VkDeviceAddress vertexBufferAddress;
+  VkDeviceAddress indexBufferAddress;
+  uint32_t vertexCount;
+  uint32_t indexCount;
 };
 
 // push constants for our mesh object draws

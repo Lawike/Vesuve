@@ -57,18 +57,18 @@ void VulkanBackend::DescriptorSet::writeBuffer(
 //--------------------------------------------------------------------------------------------------
 void VulkanBackend::DescriptorSet::writeAccelerationStructure(
   std::unique_ptr<Device>& device,
-  std::unique_ptr<Raytracing::TopLevelAccelerationStructure>& tlas,
+  Raytracing::TopLevelAccelerationStructure& tlas,
   uint32_t binding)
 {
   VkWriteDescriptorSetAccelerationStructureKHR descASInfo{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
   descASInfo.accelerationStructureCount = 1;
-  descASInfo.pAccelerationStructures = &tlas->_handle;
+  descASInfo.pAccelerationStructures = &tlas._handle;
 
   VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstBinding = binding;
-  write.dstSet = VK_NULL_HANDLE;  //left empty for now until we need to write it
   write.descriptorCount = 1;
   write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+  write.dstArrayElement = 0;
   write.dstSet = _handle;
   write.pNext = &descASInfo;
 
@@ -87,6 +87,7 @@ void VulkanBackend::DescriptorSet::updateSet(std::unique_ptr<Device>& device)
   vkUpdateDescriptorSets(device->getHandle(), (uint32_t)_writes.size(), _writes.data(), 0, nullptr);
 }
 
+//--------------------------------------------------------------------------------------------------
 void VulkanBackend::DescriptorSet::clear()
 {
   _imageInfos.clear();

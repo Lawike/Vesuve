@@ -9,10 +9,9 @@ struct DescriptorLayoutBuilder
 {
   std::vector<VkDescriptorSetLayoutBinding> bindings;
 
-  void addBinding(uint32_t binding, VkDescriptorType type);
+  void addBinding(uint32_t binding, VkDescriptorType type, VkShaderStageFlags shaderStages);
   void clear();
-  VkDescriptorSetLayout
-  build(VkDevice device, VkShaderStageFlags shaderStages, void* pNext = nullptr, VkDescriptorSetLayoutCreateFlags flags = 0);
+  VkDescriptorSetLayout build(VkDevice device, void* pNext = nullptr, VkDescriptorSetLayoutCreateFlags flags = 0);
 };
 
 struct DescriptorWriter
@@ -67,4 +66,12 @@ struct DescriptorAllocatorGrowable
   std::vector<VkDescriptorPool> fullPools;
   std::vector<VkDescriptorPool> readyPools;
   uint32_t setsPerPool{1};
+};
+
+struct DescriptorBinding
+{
+  uint32_t binding;          // Slot to which the descriptor will be bound, corresponding to the layout index in the shader.
+  uint32_t descriptorCount;  // Number of descriptors to bind
+  VkDescriptorType type;     // Type of the bound descriptor(s)
+  VkShaderStageFlags stage;  // Shader stage at which the bound resources will be available
 };

@@ -1,12 +1,13 @@
 #include "VkDescriptors.hpp"
 
 //--------------------------------------------------------------------------------------------------
-void DescriptorLayoutBuilder::addBinding(uint32_t binding, VkDescriptorType type)
+void DescriptorLayoutBuilder::addBinding(uint32_t binding, VkDescriptorType type, VkShaderStageFlags shaderStages)
 {
   VkDescriptorSetLayoutBinding newbind{};
   newbind.binding = binding;
   newbind.descriptorCount = 1;
   newbind.descriptorType = type;
+  newbind.stageFlags = shaderStages;
 
   bindings.push_back(newbind);
 }
@@ -18,17 +19,8 @@ void DescriptorLayoutBuilder::clear()
 }
 
 //--------------------------------------------------------------------------------------------------
-VkDescriptorSetLayout DescriptorLayoutBuilder::build(
-  VkDevice device,
-  VkShaderStageFlags shaderStages,
-  void* pNext,
-  VkDescriptorSetLayoutCreateFlags flags)
+VkDescriptorSetLayout DescriptorLayoutBuilder::build(VkDevice device, void* pNext, VkDescriptorSetLayoutCreateFlags flags)
 {
-  for (auto& b : bindings)
-  {
-    b.stageFlags |= shaderStages;
-  }
-
   VkDescriptorSetLayoutCreateInfo info = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   info.pNext = pNext;
 

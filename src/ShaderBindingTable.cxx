@@ -1,4 +1,5 @@
 #include "ShaderBindingTable.hpp"
+#include "VkLoader.hpp"
 
 //--------------------------------------------------------------------------------------------------
 VulkanBackend::Raytracing::ShaderBindingTable::ShaderBindingTable(
@@ -34,7 +35,7 @@ VulkanBackend::Raytracing::ShaderBindingTable::ShaderBindingTable(
 
   VmaAllocationCreateInfo vmaallocInfo = {};
   vmaallocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-  vmaallocInfo.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  vmaallocInfo.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
   VK_CHECK(vmaCreateBuffer(allocator, &bufferInfo, &vmaallocInfo, &_handle.buffer, &_handle.allocation, &_handle.info));
 
@@ -43,7 +44,10 @@ VulkanBackend::Raytracing::ShaderBindingTable::ShaderBindingTable(
   const size_t groupCount = rayGenPrograms.size() + missPrograms.size() + hitGroups.size();
   std::vector<uint8_t> shaderHandleStorage(groupCount * handleSize);
 
-  VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(
+  auto getRayTracingShaderGroupHandlesKHR = vkloader::loadFunction<PFN_vkGetRayTracingShaderGroupHandlesKHR>(
+    device->getHandle(), "vkGetRayTracingShaderGroupHandlesKHR");
+
+  VK_CHECK(getRayTracingShaderGroupHandlesKHR(
     device->getHandle(),
     rayTracingPipeline->_handle,
     0,
@@ -54,7 +58,7 @@ VulkanBackend::Raytracing::ShaderBindingTable::ShaderBindingTable(
   // Copy the shader identifiers followed by their resource pointers or root constants:
   // first the ray generation, then the miss shaders, and finally the set of hit groups.
   void* pData;
-  VK_CHECK(vkMapMemory(device->getHandle(), _handle.allocation->GetMemory(), 0, shaderBindingTableSize, 0, &pData));
+  VK_CHECK(vmaMapMemory(allocator, _handle.allocation, &pData));
 
   uint8_t* shaderTableData = static_cast<uint8_t*>(pData);
 
@@ -63,7 +67,7 @@ VulkanBackend::Raytracing::ShaderBindingTable::ShaderBindingTable(
   shaderTableData += copyShaderData(shaderTableData, properties, missPrograms, _missEntrySize, shaderHandleStorage.data());
   copyShaderData(shaderTableData, properties, hitGroups, _hitGroupEntrySize, shaderHandleStorage.data());
 
-  vkUnmapMemory(device->getHandle(), _handle.allocation->GetMemory());
+  vmaUnmapMemory(allocator, _handle.allocation);
 }
 
 //--------------------------------------------------------------------------------------------------

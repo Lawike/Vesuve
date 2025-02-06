@@ -71,7 +71,7 @@ add_executable(
     "ShaderBindingTable.hpp"
     "RaytracingProperties.cxx"
     "RaytracingProperties.hpp"
-)
+   "AccelerationStructure.cxx" "AccelerationStructure.hpp" "TopLevelAccelerationStructure.hpp" "TopLevelAccelerationStructure.cxx" "BottomLevelAccelerationStructure.hpp" "BottomLevelAccelerationStructure.cxx"  "BottomLevelGeometry.hpp")
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
@@ -100,6 +100,7 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "*.rgen"
     "*.rmiss"
     "*.rchit"
+    "*.rint"
 )
 
 foreach(GLSL ${GLSL_SOURCE_FILES})

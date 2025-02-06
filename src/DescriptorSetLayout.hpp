@@ -1,5 +1,6 @@
 #pragma once
 #include "Device.hpp"
+#include "VkDescriptors.hpp"
 #include "VkTypes.hpp"
 
 namespace VulkanBackend
@@ -7,7 +8,7 @@ namespace VulkanBackend
   class DescriptorSetLayout
   {
    public:
-    DescriptorSetLayout(std::unique_ptr<Device>& device, VkDescriptorType type, uint32_t shaderStages);
+    DescriptorSetLayout(std::unique_ptr<Device>& device, std::vector<DescriptorBinding>& descriptorBindings);
 
     VkDescriptorSetLayout _handle;
   };

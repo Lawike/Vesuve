@@ -12,13 +12,17 @@
 #include "Materials.hpp"
 #include "PhysicalDevice.hpp"
 #include "PointLight.hpp"
+#include "RaytracingPipeline.hpp"
+#include "ShaderBindingTable.hpp"
 #include "Swapchain.hpp"
+#include "TopLevelAccelerationStructure.hpp"
 #include "VkDescriptors.hpp"
 #include "VkLoader.hpp"
 #include "VkTypes.hpp"
 #include "Window.hpp"
 
 using namespace VulkanBackend;
+using namespace VulkanBackend::Raytracing;
 
 struct RenderObject
 {
@@ -79,6 +83,7 @@ class VkEngine
   bool _isInitialized{false};
   int _frameNumber{0};
   bool _stopRendering{false};
+  bool _isRaytracingEnabled{false};
   VkExtent2D _windowExtent{1700, 900};
 
   std::unique_ptr<Window> _window;
@@ -162,6 +167,26 @@ class VkEngine
   // Surface properties for tests
   SurfaceProperties _mainSurfaceProperties;
 
+  // Raytracing
+  std::unique_ptr<PipelineLayout> _raytracingPipelineLayout;
+  std::unique_ptr<RaytracingPipeline> _raytracingPipeline;
+  std::unique_ptr<Image> _accumulationImage;
+  std::unique_ptr<RaytracingProperties> _raytracingProperties;
+  std::unique_ptr<ShaderBindingTable> _shaderBindingTable;
+  DescriptorAllocatorGrowable _raytracingDescriptorAllocator;
+  std::unique_ptr<DescriptorSetLayout> _raytracingDescriptorSetLayout;
+  std::unique_ptr<DescriptorSet> _raytracingDescriptorSet;
+  std::vector<TopLevelAccelerationStructure> _topAS;
+  std::vector<BottomLevelAccelerationStructure> _bottomAS;
+  AllocatedBuffer _bottomBuffer;
+  AllocatedBuffer _scratchBuffer;
+  AllocatedBuffer _topBuffer;
+  AllocatedBuffer _topScratchBuffer;
+  AllocatedBuffer _instancesBuffer;
+
+  std::unique_ptr<DescriptorSetLayout> _rtDescriptorSetLayout;
+  std::unique_ptr<DescriptorSet> _rtDescriptorSet;
+
   static VkEngine& Get();
 
   // initializes everything in the engine
@@ -174,6 +199,7 @@ class VkEngine
   void draw();
   void drawIndirect();
   void drawBackground(VkCommandBuffer cmd);
+  void drawRaytracing(VkCommandBuffer cmd);
   void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView);
   void drawGeometry(VkCommandBuffer cmd);
   void drawMain(VkCommandBuffer cmd);
@@ -188,6 +214,7 @@ class VkEngine
   void updateScene();
 
   AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+  template<class T> void copyBuffer(VkCommandBuffer cmd, AllocatedBuffer& dstBuffer, const std::vector<T>& content);
   void destroyBuffer(const AllocatedBuffer& buffer);
 
   void createImage(
@@ -205,8 +232,14 @@ class VkEngine
   void initFrameData();
   void initImmediateCommands();
   void initDescriptors();
+  void initRaytracingDescriptors();
   void initPipelines();
   void initBackgroundPipelines();
+  void initRaytracingPipeline();
+  void initShaderBindingTable();
+  void initAccelerationStructures();
+  void createBottomLevelStructures(VkCommandBuffer cmd);
+  void createTopLevelStructures(VkCommandBuffer cmd);
   void initDefaultData();
   void initMainCamera();
   void initLight();

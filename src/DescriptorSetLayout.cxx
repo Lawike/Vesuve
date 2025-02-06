@@ -1,12 +1,15 @@
 #include "DescriptorSetLayout.hpp"
 #include "VkDescriptors.hpp"
 
+//--------------------------------------------------------------------------------------------------
 VulkanBackend::DescriptorSetLayout::DescriptorSetLayout(
   std::unique_ptr<Device>& device,
-  VkDescriptorType type,
-  uint32_t shaderStages)
+  std::vector<DescriptorBinding>& descriptorBindings)
 {
   DescriptorLayoutBuilder builder;
-  builder.addBinding(0, type);
-  _handle = builder.build(device->getHandle(), shaderStages);
+  for (const auto binding : descriptorBindings)
+  {
+    builder.addBinding(binding.binding, binding.type, binding.stage);
+  }
+  _handle = builder.build(device->getHandle());
 }
