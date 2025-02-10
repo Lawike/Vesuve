@@ -8,12 +8,17 @@ project(vesuve VERSION 0.0 LANGUAGES CXX)
 set(CMAKE_CXX_FLAGS "/fsanitize=address")
 set(CMAKE_C_FLAGS "/fsanitize=address")
 
-# Installed libs
+# Required Installed libs
 find_package(Vulkan REQUIRED)
-find_package(SDL2 REQUIRED)
-find_package(imgui CONFIG REQUIRED)
 
 include(FetchContent)
+
+FetchContent_Declare(
+  SDL
+  GIT_REPOSITORY https://github.com/libsdl-org/SDL/
+  GIT_TAG        release-2.32.0
+)
+FetchContent_MakeAvailable(SDL)
 
 FetchContent_Declare(
   glm
@@ -21,6 +26,12 @@ FetchContent_Declare(
   GIT_TAG        1.0.1
 )
 FetchContent_MakeAvailable(glm)
+
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY "${CMAKE_CURRENT_SOURCE_DIR}/external/imgui"
+)
+FetchContent_MakeAvailable(imgui)
 
 FetchContent_Declare(
   fmt
@@ -44,6 +55,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fetch_fastgltf)
 
 add_subdirectory(src)
+target_include_directories(Vesuve PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/external/stb")
 
 add_custom_target(copy_assets
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_LIST_DIR}/copy-assets.cmake

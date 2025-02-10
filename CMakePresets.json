@@ -12,8 +12,7 @@
         "CMAKE_INSTALL_PREFIX": "./install-debug"
       },
       "environment": {
-        "VULKAN_SDK": "",
-        "STB_DIR": "",
+        "VULKAN_SDK": ""
       }
     }
   ],

@@ -75,19 +75,14 @@ add_executable(
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
-if(NOT DEFINED ENV{STB_DIR})
-    message(FATAL_ERROR "La variable d'environnement STB_DIR n'est pas définie.")
-endif()
-target_include_directories(Vesuve PRIVATE $ENV{STB_DIR})
-
 target_link_libraries(Vesuve PRIVATE 
 	glm::glm
 	Vulkan::Vulkan
     fmt::fmt
     vk-bootstrap::vk-bootstrap
-    imgui::imgui
-    imgui::imgui_impl_vulkan
-    imgui::imgui_impl_sdl2
+    imgui
+    imgui_impl_vulkan
+    imgui_impl_sdl2
     fastgltf::fastgltf
 )
 
