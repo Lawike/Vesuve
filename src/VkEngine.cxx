@@ -970,17 +970,18 @@ void VkEngine::initRaytracingDescriptors()
     {0, 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
     // Output image
     {1, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
-    // Vertex & index buffer
-    //{2, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR},
   };
-
   _raytracingDescriptorAllocator.init(_device->getHandle(), 1, sizes);
   _raytracingDescriptorSetLayout = std::make_unique<DescriptorSetLayout>(_device, bindings);
   _raytracingDescriptorSet =
     std::make_unique<DescriptorSet>(_device, _raytracingDescriptorSetLayout, _raytracingDescriptorAllocator);
 
-  _raytracingDescriptorSet->writeAccelerationStructure(_device, _topAS[0], 0);
+  VkWriteDescriptorSetAccelerationStructureKHR descASInfo{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+  descASInfo.accelerationStructureCount = 1;
+  descASInfo.pAccelerationStructures = &_topAS[0]._handle;
+  _raytracingDescriptorSet->writeAccelerationStructure(_device, _topAS[0], 0, descASInfo);
   _raytracingDescriptorSet->writeImage(_device, _drawImage, 1);
+
   _raytracingDescriptorSet->updateSet(_device);
 }
 
@@ -1109,19 +1110,22 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
   VkDeviceSize maxScratchSize{0};  // Largest scratch size
   for (auto mesh : _testMeshes)
   {
-    VkAccelerationStructureGeometryKHR geometry = {};
-    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    geometry.pNext = nullptr;
-    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-    geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-    geometry.geometry.triangles.pNext = nullptr;
-    geometry.geometry.triangles.vertexData.deviceAddress = mesh->meshBuffers.vertexBufferAddress;
-    geometry.geometry.triangles.vertexStride = sizeof(Vertex);
-    geometry.geometry.triangles.maxVertex = mesh->meshBuffers.vertexCount;
-    geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-    geometry.geometry.triangles.indexData.deviceAddress = mesh->meshBuffers.indexBufferAddress;
-    geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-    geometry.geometry.triangles.transformData = {};
+    // Only triangle meshes for now
+    VkAccelerationStructureGeometryTrianglesDataKHR triangles{
+      VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
+    triangles.pNext = nullptr;
+    triangles.vertexData.deviceAddress = mesh->meshBuffers.vertexBufferAddress;
+    triangles.vertexStride = sizeof(Vertex);
+    triangles.maxVertex = mesh->meshBuffers.vertexCount - 1;
+    triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+    triangles.indexData.deviceAddress = mesh->meshBuffers.indexBufferAddress;
+    triangles.indexType = VK_INDEX_TYPE_UINT32;
+    // Indicate identity transform by setting transformData to null device pointer.
+    triangles.transformData = {};
+
+    // General geometry container described as containing opaque triangles
+    VkAccelerationStructureGeometryKHR geometry = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+    geometry.geometry.triangles = triangles;
     geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 
     geometries.push_back(geometry);
@@ -1136,10 +1140,8 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
 
     vertexOffset += mesh->meshBuffers.vertexCount * sizeof(Vertex);
     indexOffset += mesh->meshBuffers.indexCount * sizeof(uint32_t);
-
-    _bottomAS.emplace_back(BottomLevelAccelerationStructure{_device, _raytracingProperties, geometries, offsetInfos});
   }
-
+  _bottomAS.emplace_back(BottomLevelAccelerationStructure{_device, _raytracingProperties, geometries, offsetInfos});
 
   // Allocate memory for bottom acceleration structure
   const auto total = GetTotalRequirements(_bottomAS);
@@ -1157,7 +1159,6 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
   // Generate the structures.
   VkDeviceSize resultOffset = 0;
   VkDeviceSize scratchOffset = 0;
-
   for (BottomLevelAccelerationStructure& accelerationStructure : _bottomAS)
   {
     accelerationStructure.Generate(_device, cmd, _scratchBuffer, scratchOffset, _bottomBuffer, resultOffset);
@@ -1165,6 +1166,8 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
     resultOffset += accelerationStructure._buildSizesInfo.accelerationStructureSize;
     scratchOffset += accelerationStructure._buildSizesInfo.buildScratchSize;
   }
+
+  // Fill deletion queue with Acceleration structure
   _deletionQueue.push(
     [=]()
     {
@@ -1182,7 +1185,7 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
 //--------------------------------------------------------------------------------------------------
 void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
 {
-  // Top level acceleration structure
+  //Top level acceleration structure
   std::vector<VkAccelerationStructureInstanceKHR> instances;
 
   // Hit group 0: triangles

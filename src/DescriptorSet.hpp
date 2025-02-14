@@ -21,7 +21,8 @@ namespace VulkanBackend
     void writeAccelerationStructure(
       std::unique_ptr<Device>& device,
       Raytracing::TopLevelAccelerationStructure& tlas,
-      uint32_t binding);
+      uint32_t binding,
+      VkWriteDescriptorSetAccelerationStructureKHR descInfo);
     void destroyPools(std::unique_ptr<Device>& device);
     void updateSet(std::unique_ptr<Device>& device);
     void clear();
