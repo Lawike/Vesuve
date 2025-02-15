@@ -7,6 +7,7 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
   _features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
   _features13.dynamicRendering = true;
   _features13.synchronization2 = true;
+  _features13.maintenance4 = true;
 
   //vulkan 1.2 features
   _features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
@@ -34,6 +35,7 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
                  .add_required_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
                  .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
                  .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
+                 .add_required_extension(VK_KHR_SPIRV_1_4_EXTENSION_NAME)
                  .add_required_extension_features(accelerationStructureFeatures)
                  .add_required_extension_features(rayTracingFeatures)
                  .set_surface(surface)

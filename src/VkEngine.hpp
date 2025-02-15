@@ -184,9 +184,6 @@ class VkEngine
   AllocatedBuffer _topScratchBuffer;
   AllocatedBuffer _instancesBuffer;
 
-  std::unique_ptr<DescriptorSetLayout> _rtDescriptorSetLayout;
-  std::unique_ptr<DescriptorSet> _rtDescriptorSet;
-
   static VkEngine& Get();
 
   // initializes everything in the engine

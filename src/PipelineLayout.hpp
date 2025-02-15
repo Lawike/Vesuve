@@ -8,7 +8,7 @@ namespace VulkanBackend
    public:
     PipelineLayout(
       std::unique_ptr<Device>& device,
-      std::unique_ptr<DescriptorSetLayout>& descriptorLayout,
+      std::vector<VkDescriptorSetLayout>& descriptorLayout,
       std::vector<VkPushConstantRange>& pushConstants);
     VkPipelineLayout _handle;
   };

@@ -118,10 +118,10 @@ void VkEngine::init()
   this->initPipelines();
   UserInterface::init(this);
   this->initDefaultData();
+  this->initRaytracingDescriptors();
   this->initRaytracingPipeline();
   this->initShaderBindingTable();
   this->initAccelerationStructures();
-  this->initRaytracingDescriptors();
 
   this->initMainCamera();
   this->initLight();
@@ -976,6 +976,7 @@ void VkEngine::initRaytracingDescriptors()
   _raytracingDescriptorSet =
     std::make_unique<DescriptorSet>(_device, _raytracingDescriptorSetLayout, _raytracingDescriptorAllocator);
 
+  /*
   VkWriteDescriptorSetAccelerationStructureKHR descASInfo{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
   descASInfo.accelerationStructureCount = 1;
   descASInfo.pAccelerationStructures = &_topAS[0]._handle;
@@ -983,6 +984,7 @@ void VkEngine::initRaytracingDescriptors()
   _raytracingDescriptorSet->writeImage(_device, _drawImage, 1);
 
   _raytracingDescriptorSet->updateSet(_device);
+  */
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1003,7 +1005,9 @@ void VkEngine::initBackgroundPipelines()
   std::vector<VkPushConstantRange> pushConstants;
   pushConstants.push_back(pushConstant);
 
-  _gradientPipelineLayout = std::make_unique<PipelineLayout>(_device, _drawImageDescriptorLayout, pushConstants);
+  std::vector<VkDescriptorSetLayout> descriptors = {_drawImageDescriptorLayout->_handle};
+
+  _gradientPipelineLayout = std::make_unique<PipelineLayout>(_device, descriptors, pushConstants);
 
   _gradientPipeline =
     std::make_unique<ComputePipeline>(_device, _gradientPipelineLayout, "../shaders/gradient_color.comp.spv", "gradient");
@@ -1038,9 +1042,11 @@ void VkEngine::initRaytracingPipeline()
   VkExtent3D imageExtent{_windowExtent.width, _windowExtent.height, 1};
 
   _accumulationImage = std::make_unique<Image>(_device, imageExtent, imageFormat, drawImageUsages, _allocator, false);
+  std::vector<VkDescriptorSetLayout> descriptors = {
+    _raytracingDescriptorSetLayout->_handle, _drawImageDescriptorLayout->_handle};
 
   std::vector<VkPushConstantRange> pushConstants;
-  _raytracingPipelineLayout = std::make_unique<PipelineLayout>(_device, _drawImageDescriptorLayout, pushConstants);
+  _raytracingPipelineLayout = std::make_unique<PipelineLayout>(_device, descriptors, pushConstants);
 
   // Load shaders
   std::string raygenShader = "../shaders/raygen.rgen.spv";

@@ -3,14 +3,14 @@
 //--------------------------------------------------------------------------------------------------
 VulkanBackend::PipelineLayout::PipelineLayout(
   std::unique_ptr<Device>& device,
-  std::unique_ptr<DescriptorSetLayout>& descriptorLayout,
+  std::vector<VkDescriptorSetLayout>& descriptorLayout,
   std::vector<VkPushConstantRange>& pushConstants)
 {
   VkPipelineLayoutCreateInfo layout{};
   layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   layout.pNext = nullptr;
-  layout.pSetLayouts = &descriptorLayout->_handle;
-  layout.setLayoutCount = 1;
+  layout.pSetLayouts = &descriptorLayout.at(0);
+  layout.setLayoutCount = descriptorLayout.size();
   layout.pPushConstantRanges = pushConstants.data();
   layout.pushConstantRangeCount = pushConstants.size();
 
