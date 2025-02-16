@@ -122,6 +122,7 @@ void VkEngine::init()
   this->initRaytracingPipeline();
   this->initShaderBindingTable();
   this->initAccelerationStructures();
+  this->updateRaytracingDescriptors();
 
   this->initMainCamera();
   this->initLight();
@@ -976,7 +977,18 @@ void VkEngine::initRaytracingDescriptors()
   _raytracingDescriptorSet =
     std::make_unique<DescriptorSet>(_device, _raytracingDescriptorSetLayout, _raytracingDescriptorAllocator);
 
-  /*
+  //make sure both the descriptor allocator and the new layout get cleaned up properly
+  _deletionQueue.push(
+    [&]()
+    {
+      _raytracingDescriptorSet->destroyPools(_device);
+      vkDestroyDescriptorSetLayout(_device->getHandle(), _raytracingDescriptorSetLayout->_handle, nullptr);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+void VkEngine::updateRaytracingDescriptors()
+{
   VkWriteDescriptorSetAccelerationStructureKHR descASInfo{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
   descASInfo.accelerationStructureCount = 1;
   descASInfo.pAccelerationStructures = &_topAS[0]._handle;
@@ -984,7 +996,6 @@ void VkEngine::initRaytracingDescriptors()
   _raytracingDescriptorSet->writeImage(_device, _drawImage, 1);
 
   _raytracingDescriptorSet->updateSet(_device);
-  */
 }
 
 //--------------------------------------------------------------------------------------------------

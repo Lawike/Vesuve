@@ -230,6 +230,7 @@ class VkEngine
   void initImmediateCommands();
   void initDescriptors();
   void initRaytracingDescriptors();
+  void updateRaytracingDescriptors();
   void initPipelines();
   void initBackgroundPipelines();
   void initRaytracingPipeline();
