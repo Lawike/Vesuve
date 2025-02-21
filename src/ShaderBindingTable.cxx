@@ -16,7 +16,7 @@ VulkanBackend::Raytracing::ShaderBindingTable::ShaderBindingTable(
   _hitGroupEntrySize = getEntrySize(hitGroups, properties);
 
   _raygenOffset = 0;
-  _missOffset = rayGenPrograms.size() + _raygenEntrySize;
+  _missOffset = rayGenPrograms.size() * _raygenEntrySize;
   _hitGroupOffset = _missOffset + missPrograms.size() * _missEntrySize;
 
   _raygenSize = rayGenPrograms.size() * _raygenEntrySize;
@@ -38,6 +38,16 @@ VulkanBackend::Raytracing::ShaderBindingTable::ShaderBindingTable(
   vmaallocInfo.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
   VK_CHECK(vmaCreateBuffer(allocator, &bufferInfo, &vmaallocInfo, &_handle.buffer, &_handle.allocation, &_handle.info));
+
+  VkBufferDeviceAddressInfo memoryAddressInfo = {};
+  memoryAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+  memoryAddressInfo.pNext = nullptr;
+  memoryAddressInfo.buffer = _handle.buffer;
+
+  // Compute & store the device address of the shader
+  _raygenShaderAddress = vkGetBufferDeviceAddress(device->getHandle(), &memoryAddressInfo) + _raygenOffset;
+  _missShaderAddress = _raygenShaderAddress + _missOffset;
+  _closesHitShaderAddress = _raygenShaderAddress + _hitGroupOffset;
 
   // Generate the table.
   const uint32_t handleSize = properties->_pipelineProperties.shaderGroupHandleSize;

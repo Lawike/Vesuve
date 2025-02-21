@@ -95,6 +95,7 @@ void UserInterface::display(VkEngine* engine)
   displayBackground(engine);
   displaySceneSelector(engine);
   displayLighting(engine);
+  displayRenderingModeSelector(engine);
 
   ImGui::Render();
 }
@@ -161,6 +162,16 @@ void UserInterface::displayLighting(VkEngine* engine)
     ImGui::InputFloat("Shininess", (float*)&engine->_mainSurfaceProperties.shininess);
     ImGui::InputFloat("Gamma", (float*)&engine->_mainSurfaceProperties.screenGamma);
 
+    ImGui::End();
+  }
+}
+
+//--------------------------------------------------------------------------------------------------
+void UserInterface::displayRenderingModeSelector(VkEngine* engine)
+{
+  if (ImGui::Begin("Rendering Mode Selector"))
+  {
+    ImGui::Checkbox("Raytracing", (bool*)&engine->_isRaytracingEnabled);
     ImGui::End();
   }
 }

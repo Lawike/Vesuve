@@ -20,4 +20,5 @@ static class UserInterface
   static void displayBackground(VkEngine* engine);
   static void displaySceneSelector(VkEngine* engine);
   static void displayLighting(VkEngine* engine);
+  static void displayRenderingModeSelector(VkEngine* engine);
 };

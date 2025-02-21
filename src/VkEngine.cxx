@@ -356,16 +356,26 @@ void VkEngine::drawBackground(VkCommandBuffer cmd)
   vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
 }
 
+//--------------------------------------------------------------------------------------------------
 void VkEngine::drawRaytracing(VkCommandBuffer cmd)
 {
-}
-
-//--------------------------------------------------------------------------------------------------
-/* void VkEngine::drawRaytracing(VkCommandBuffer cmd)
-{
   //const auto extent = SwapChain().Extent();
+  //allocate a new uniform buffer for the scene data
+  AllocatedBuffer gpuSceneDataBuffer =
+    this->createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-  //VkDescriptorSet descriptorSets[] = {_rayTracingPipeline->DescriptorSet(imageIndex)};
+  //add it to the deletion queue of this frame so it gets deleted once its been used
+  this->getCurrentFrame()->_deletionQueue.push([=, this]() { this->destroyBuffer(gpuSceneDataBuffer); });
+
+  //write the buffer
+  GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
+  *sceneUniformData = _sceneData;
+
+  //create a descriptor set that binds that buffer and update it
+  VkDescriptorSet globalDescriptor =
+    this->getCurrentFrame()->_frameDescriptors.allocate(_device->getHandle(), _gpuSceneDataDescriptorLayout->_handle);
+
+  std::vector<VkDescriptorSet> descriptorSets{_raytracingDescriptorSet->_handle, /*globalDescriptor*/};
 
   VkImageSubresourceRange subresourceRange = {};
   subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -419,7 +429,14 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
   // Bind ray tracing pipeline.
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, _raytracingPipeline->_handle);
   vkCmdBindDescriptorSets(
-    cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, _raytracingPipelineLayout->_handle, 0, 1, descriptorSets, 0, nullptr);
+    cmd,
+    VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+    _raytracingPipelineLayout->_handle,
+    0,
+    descriptorSets.size(),
+    descriptorSets.data(),
+    0,
+    nullptr);
 
   // Describe the shader binding table.
   VkStridedDeviceAddressRegionKHR raygenShaderBindingTable = {};
@@ -440,7 +457,8 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
   VkStridedDeviceAddressRegionKHR callableShaderBindingTable = {};
 
   // Execute ray tracing shaders.
-  vkCmdTraceRaysKHR(
+  auto cmdTraceRaysKHR = vkloader::loadFunction<PFN_vkCmdTraceRaysKHR>(_device->getHandle(), "vkCmdTraceRaysKHR");
+  cmdTraceRaysKHR(
     cmd,
     &raygenShaderBindingTable,
     &missShaderBindingTable,
@@ -449,52 +467,7 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
     _windowExtent.width,
     _windowExtent.height,
     1);
-  // Acquire output image and swap-chain image for copying.
-  ImageMemoryBarrier::Insert(
-    commandBuffer,
-    outputImage_->Handle(),
-    subresourceRange,
-    VK_ACCESS_SHADER_WRITE_BIT,
-    VK_ACCESS_TRANSFER_READ_BIT,
-    VK_IMAGE_LAYOUT_GENERAL,
-    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-  ImageMemoryBarrier::Insert(
-    commandBuffer,
-    SwapChain().Images()[imageIndex],
-    subresourceRange,
-    0,
-    VK_ACCESS_TRANSFER_WRITE_BIT,
-    VK_IMAGE_LAYOUT_UNDEFINED,
-    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-  // Copy output image into swap-chain image.
-  VkImageCopy copyRegion;
-  copyRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-  copyRegion.srcOffset = {0, 0, 0};
-  copyRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-  copyRegion.dstOffset = {0, 0, 0};
-  copyRegion.extent = {extent.width, extent.height, 1};
-
-  vkCmdCopyImage(
-    commandBuffer,
-    outputImage_->Handle(),
-    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-    SwapChain().Images()[imageIndex],
-    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    1,
-    &copyRegion);
-
-  ImageMemoryBarrier::Insert(
-    commandBuffer,
-    SwapChain().Images()[imageIndex],
-    subresourceRange,
-    VK_ACCESS_TRANSFER_WRITE_BIT,
-    0,
-    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 }
-*/
 //--------------------------------------------------------------------------------------------------
 void VkEngine::drawImgui(VkCommandBuffer cmd, VkImageView targetImageView)
 {
@@ -669,25 +642,25 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
     vkinit::depthAttachmentInfo(_depthImage->_handle.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingInfo renderInfo = vkinit::renderingInfo(_windowExtent, &colorAttachment, &depthAttachment);
-
-  vkCmdBeginRendering(cmd, &renderInfo);
-  auto start = std::chrono::system_clock::now();
-  // Draw either blinn phong or ray tracing.
   if (!_isRaytracingEnabled)
   {
+    vkCmdBeginRendering(cmd, &renderInfo);
+    auto start = std::chrono::system_clock::now();
+    // Draw either blinn phong or ray tracing.
+
     this->drawGeometry(cmd);
+    auto end = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+
+    _stats.meshDrawTime = elapsed.count() / 1000.f;
+
+    vkCmdEndRendering(cmd);
   }
   else
   {
     this->drawRaytracing(cmd);
   }
-
-  auto end = std::chrono::system_clock::now();
-  auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-  _stats.meshDrawTime = elapsed.count() / 1000.f;
-
-  vkCmdEndRendering(cmd);
 }
 
 //--------------------------------------------------------------------------------------------------
