@@ -137,6 +137,7 @@ class VkEngine
   GPUSceneData _sceneData;
 
   std::unique_ptr<DescriptorSetLayout> _gpuSceneDataDescriptorLayout;
+  std::unique_ptr<DescriptorSet> _gpuSceneDataDescriptorSet;
 
   //Default texture for tests
   std::unique_ptr<Image> _whiteImage;

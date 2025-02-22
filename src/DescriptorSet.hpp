@@ -7,6 +7,7 @@
 #include "VkDescriptors.hpp"
 #include "VkTypes.hpp"
 
+
 namespace VulkanBackend
 {
   class DescriptorSet
@@ -23,6 +24,22 @@ namespace VulkanBackend
       Raytracing::TopLevelAccelerationStructure& tlas,
       uint32_t binding,
       VkWriteDescriptorSetAccelerationStructureKHR descInfo);
+    template<class TUniformData> void writeUniformBuffer(
+      std::unique_ptr<Device>& device,
+      AllocatedBuffer& buffer,
+      TUniformData* destData,
+      TUniformData& srcData,
+      uint32_t binding,
+      size_t size,
+      size_t offset)
+    {
+      //write the buffer
+      *destData = srcData;
+
+      DescriptorWriter writer;
+      writer.writeBuffer(binding, buffer.buffer, size, offset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+      writer.updateSet(device->getHandle(), this->_handle);
+    }
     void destroyPools(std::unique_ptr<Device>& device);
     void updateSet(std::unique_ptr<Device>& device);
     void clear();

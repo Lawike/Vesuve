@@ -514,25 +514,6 @@ void VkEngine::drawGeometry(VkCommandBuffer cmd)
       }
     });
 
-  //allocate a new uniform buffer for the scene data
-  AllocatedBuffer gpuSceneDataBuffer =
-    this->createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-  //add it to the deletion queue of this frame so it gets deleted once its been used
-  this->getCurrentFrame()->_deletionQueue.push([=, this]() { this->destroyBuffer(gpuSceneDataBuffer); });
-
-  //write the buffer
-  GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
-  *sceneUniformData = _sceneData;
-
-  //create a descriptor set that binds that buffer and update it
-  VkDescriptorSet globalDescriptor =
-    this->getCurrentFrame()->_frameDescriptors.allocate(_device->getHandle(), _gpuSceneDataDescriptorLayout->_handle);
-
-  DescriptorWriter writer;
-  writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  writer.updateSet(_device->getHandle(), globalDescriptor);
-
   //defined outside of the draw function, this is the state we will try to skip
   MaterialPipeline* lastPipeline = nullptr;
   MaterialInstance* lastMaterial = nullptr;
@@ -549,7 +530,14 @@ void VkEngine::drawGeometry(VkCommandBuffer cmd)
         lastPipeline = r.material->pipeline;
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->pipeline);
         vkCmdBindDescriptorSets(
-          cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
+          cmd,
+          VK_PIPELINE_BIND_POINT_GRAPHICS,
+          r.material->pipeline->layout,
+          0,
+          1,
+          &_gpuSceneDataDescriptorSet->_handle,
+          0,
+          nullptr);
 
         VkViewport viewport = {};
         viewport.x = 0;
@@ -640,6 +628,23 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
     vkinit::attachmentInfo(_drawImage->_handle.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo depthAttachment =
     vkinit::depthAttachmentInfo(_depthImage->_handle.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+  _gpuSceneDataDescriptorSet =
+    std::make_unique<DescriptorSet>(_device, _gpuSceneDataDescriptorLayout, _globalDescriptorAllocator);
+
+  //allocate a new uniform buffer for the scene data
+  AllocatedBuffer gpuSceneDataBuffer =
+    this->createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+  //add it to the deletion queue of this frame so it gets deleted once its been used
+  this->getCurrentFrame()->_deletionQueue.push([=, this]() { this->destroyBuffer(gpuSceneDataBuffer); });
+
+  //get the memory mapped data using vma
+  GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
+
+  //write the data into the buffer
+  _gpuSceneDataDescriptorSet->writeUniformBuffer(
+    _device, gpuSceneDataBuffer, sceneUniformData, _sceneData, 0, sizeof(GPUSceneData), 0);
 
   VkRenderingInfo renderInfo = vkinit::renderingInfo(_windowExtent, &colorAttachment, &depthAttachment);
   if (!_isRaytracingEnabled)
