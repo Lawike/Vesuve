@@ -359,23 +359,7 @@ void VkEngine::drawBackground(VkCommandBuffer cmd)
 //--------------------------------------------------------------------------------------------------
 void VkEngine::drawRaytracing(VkCommandBuffer cmd)
 {
-  //const auto extent = SwapChain().Extent();
-  //allocate a new uniform buffer for the scene data
-  AllocatedBuffer gpuSceneDataBuffer =
-    this->createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-  //add it to the deletion queue of this frame so it gets deleted once its been used
-  this->getCurrentFrame()->_deletionQueue.push([=, this]() { this->destroyBuffer(gpuSceneDataBuffer); });
-
-  //write the buffer
-  GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
-  *sceneUniformData = _sceneData;
-
-  //create a descriptor set that binds that buffer and update it
-  VkDescriptorSet globalDescriptor =
-    this->getCurrentFrame()->_frameDescriptors.allocate(_device->getHandle(), _gpuSceneDataDescriptorLayout->_handle);
-
-  std::vector<VkDescriptorSet> descriptorSets{_raytracingDescriptorSet->_handle, /*globalDescriptor*/};
+  std::vector<VkDescriptorSet> descriptorSets{_raytracingDescriptorSet->_handle, _gpuSceneDataDescriptorSet->_handle};
 
   VkImageSubresourceRange subresourceRange = {};
   subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -647,16 +631,16 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
     _device, gpuSceneDataBuffer, sceneUniformData, _sceneData, 0, sizeof(GPUSceneData), 0);
 
   VkRenderingInfo renderInfo = vkinit::renderingInfo(_windowExtent, &colorAttachment, &depthAttachment);
+
+  // Draw either blinn phong or ray tracing.
   if (!_isRaytracingEnabled)
   {
     vkCmdBeginRendering(cmd, &renderInfo);
     auto start = std::chrono::system_clock::now();
-    // Draw either blinn phong or ray tracing.
 
     this->drawGeometry(cmd);
     auto end = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
 
     _stats.meshDrawTime = elapsed.count() / 1000.f;
 
@@ -742,9 +726,13 @@ void VkEngine::updateScene()
 
   _mainCamera.update();
 
+  _sceneData.aspectRatio = (float)_swapchain->getSwapchainExtent().width / (float)_swapchain->getSwapchainExtent().height;
   auto view = _mainCamera.getViewMatrix();
 
   _sceneData.view = view;
+  _sceneData.rtView =
+    view * glm::scale(glm::mat4(1.0f), glm::vec3(_sceneData.aspectRatio, -1, _sceneData.aspectRatio));  // Flip Y
+  _sceneData.invView = glm::inverse(_sceneData.rtView);
   _sceneData.lightPosition = _mainLight.position;
   _sceneData.lightColor = _mainLight.color;
   _sceneData.lightPower = _mainLight.power;
@@ -756,14 +744,18 @@ void VkEngine::updateScene()
   // camera projection
   _sceneData.proj =
     glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
+  _sceneData.rtProj = _sceneData.proj;
+  _sceneData.invProj = glm::inverse(_sceneData.rtProj);
+  _sceneData.proj[1][1] *= -1;
+  //_sceneData.invProj[1][1] *= -1;
 
   // invert the Y direction on projection matrix so that we are more similar
   // to opengl and gltf axis
-  _sceneData.proj[1][1] *= -1;
   _sceneData.viewproj = _sceneData.proj * _sceneData.view;
 
   //some default lighting parameters
   _sceneData.ambientColor = glm::vec4(.1f);
+
 
   if (!_selectedNodeName.empty())
   {
@@ -1032,7 +1024,7 @@ void VkEngine::initRaytracingPipeline()
 
   _accumulationImage = std::make_unique<Image>(_device, imageExtent, imageFormat, drawImageUsages, _allocator, false);
   std::vector<VkDescriptorSetLayout> descriptors = {
-    _raytracingDescriptorSetLayout->_handle, _drawImageDescriptorLayout->_handle};
+    _raytracingDescriptorSetLayout->_handle, _gpuSceneDataDescriptorLayout->_handle};
 
   std::vector<VkPushConstantRange> pushConstants;
   _raytracingPipelineLayout = std::make_unique<PipelineLayout>(_device, descriptors, pushConstants);
@@ -1080,13 +1072,19 @@ void VkEngine::initShaderBindingTable()
 void VkEngine::initAccelerationStructures()
 {
   std::unique_ptr<CommandPool> pool = std::make_unique<CommandPool>(_device);
-  std::unique_ptr<SingleTimeCommand> cmd =
-    std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
 
-  cmd->begin();
-  createBottomLevelStructures(cmd->buffer);
-  createTopLevelStructures(cmd->buffer);
-  cmd->end();
+  // Use of 2 command buffer to avoid race conditions
+  std::unique_ptr<SingleTimeCommand> cmdBottom =
+    std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
+  cmdBottom->begin();
+  createBottomLevelStructures(cmdBottom->buffer);
+  cmdBottom->end();
+
+  std::unique_ptr<SingleTimeCommand> cmdTop =
+    std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
+  cmdTop->begin();
+  createTopLevelStructures(cmdTop->buffer);
+  cmdTop->end();
 
   vkDestroyCommandPool(_device->getHandle(), pool->getHandle(), nullptr);
 }

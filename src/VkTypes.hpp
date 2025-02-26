@@ -90,7 +90,11 @@ static_assert(sizeof(GPUGLTFMaterial) == 256);
 struct GPUSceneData
 {
   glm::mat4 view;
+  glm::mat4 rtView;
+  glm::mat4 invView;
   glm::mat4 proj;
+  glm::mat4 rtProj;
+  glm::mat4 invProj;
   glm::mat4 viewproj;
   glm::vec4 ambientColor;
   glm::vec4 cameraPosition;
@@ -101,8 +105,9 @@ struct GPUSceneData
   float ambientCoefficient;
   float shininess;
   float screenGamma;
+  float aspectRatio;
   // For 256 bytes alignment
-  float extra[59];
+  float extra[58];
 };
 
 enum class MaterialPass : uint8_t
