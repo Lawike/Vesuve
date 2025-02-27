@@ -132,7 +132,7 @@ class VkEngine
 
   std::vector<std::shared_ptr<MeshAsset>> _testMeshes;
 
-  bool resize_requested = false;
+  bool _resize_requested = false;
 
   GPUSceneData _sceneData;
 

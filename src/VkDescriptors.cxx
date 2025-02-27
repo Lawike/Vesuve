@@ -1,11 +1,15 @@
 #include "VkDescriptors.hpp"
 
 //--------------------------------------------------------------------------------------------------
-void DescriptorLayoutBuilder::addBinding(uint32_t binding, VkDescriptorType type, VkShaderStageFlags shaderStages)
+void DescriptorLayoutBuilder::addBinding(
+  uint32_t binding,
+  VkDescriptorType type,
+  VkShaderStageFlags shaderStages,
+  uint32_t descriptorCount)
 {
   VkDescriptorSetLayoutBinding newbind{};
   newbind.binding = binding;
-  newbind.descriptorCount = 1;
+  newbind.descriptorCount = descriptorCount;
   newbind.descriptorType = type;
   newbind.stageFlags = shaderStages;
 

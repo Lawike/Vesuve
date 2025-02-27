@@ -9,7 +9,7 @@ struct DescriptorLayoutBuilder
 {
   std::vector<VkDescriptorSetLayoutBinding> bindings;
 
-  void addBinding(uint32_t binding, VkDescriptorType type, VkShaderStageFlags shaderStages);
+  void addBinding(uint32_t binding, VkDescriptorType type, VkShaderStageFlags shaderStages, uint32_t descriptorCount);
   void clear();
   VkDescriptorSetLayout build(VkDevice device, void* pNext = nullptr, VkDescriptorSetLayoutCreateFlags flags = 0);
 };

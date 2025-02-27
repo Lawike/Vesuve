@@ -209,7 +209,7 @@ void VkEngine::draw()
     &swapchainImageIndex);
   if (e == VK_ERROR_OUT_OF_DATE_KHR)
   {
-    resize_requested = true;
+    _resize_requested = true;
     return;
   }
 
@@ -312,7 +312,7 @@ void VkEngine::draw()
   VkResult presentResult = vkQueuePresentKHR(_device->getGraphicsQueue(), &presentInfo);
   if (e == VK_ERROR_OUT_OF_DATE_KHR)
   {
-    resize_requested = true;
+    _resize_requested = true;
     return;
   }
   //increase the number of frames drawn
@@ -665,7 +665,7 @@ GPUMeshBuffers VkEngine::uploadMesh(std::span<uint32_t> indices, std::span<Verte
     vertexBufferSize,
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-    VMA_MEMORY_USAGE_GPU_ONLY);
+    VMA_MEMORY_USAGE_AUTO);
   newSurface.vertexCount = vertices.size();
 
   //find the address of the vertex buffer
@@ -678,7 +678,7 @@ GPUMeshBuffers VkEngine::uploadMesh(std::span<uint32_t> indices, std::span<Verte
     indexBufferSize,
     VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-    VMA_MEMORY_USAGE_GPU_ONLY);
+    VMA_MEMORY_USAGE_AUTO);
   newSurface.indexCount = indices.size();
 
   //find the address of the index buffer
@@ -796,7 +796,7 @@ void VkEngine::run()
       //send SDL event to imgui for handling
       ImGui_ImplSDL2_ProcessEvent(&e);
     }
-    if (resize_requested)
+    if (_resize_requested)
     {
       resizeSwapchain();
     }
@@ -941,6 +941,8 @@ void VkEngine::initRaytracingDescriptors()
     {0, 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
     // Output image
     {1, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
+    // vertex & index buffer descriptors
+    {2, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
   };
   _raytracingDescriptorAllocator.init(_device->getHandle(), 1, sizes);
   _raytracingDescriptorSetLayout = std::make_unique<DescriptorSetLayout>(_device, bindings);
@@ -959,11 +961,23 @@ void VkEngine::initRaytracingDescriptors()
 //--------------------------------------------------------------------------------------------------
 void VkEngine::updateRaytracingDescriptors()
 {
+  // Write acceleration structure
   VkWriteDescriptorSetAccelerationStructureKHR descASInfo{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
   descASInfo.accelerationStructureCount = 1;
   descASInfo.pAccelerationStructures = &_topAS[0]._handle;
   _raytracingDescriptorSet->writeAccelerationStructure(_device, _topAS[0], 0, descASInfo);
+
+  // Write output image
   _raytracingDescriptorSet->writeImage(_device, _drawImage, 1);
+
+  // Write vertex & index buffers
+  size_t totalSize = 0;
+  AllocatedBuffer vertexBuffer = _testMeshes[0]->meshBuffers.vertexBuffer;
+  totalSize += vertexBuffer.info.size;
+  AllocatedBuffer indexBuffer = _testMeshes[0]->meshBuffers.indexBuffer;
+  totalSize += indexBuffer.info.size;
+  std::vector<AllocatedBuffer> buffers = {vertexBuffer, indexBuffer};
+  _raytracingDescriptorSet->writeBuffers(_device, buffers, 2, 0);
 
   _raytracingDescriptorSet->updateSet(_device);
 }
@@ -1380,7 +1394,7 @@ void VkEngine::resizeSwapchain()
   _swapchain.reset();
   _swapchain = std::make_unique<Swapchain>(_chosenGPU, _device, _surface, _windowExtent.width, _windowExtent.height);
 
-  resize_requested = false;
+  _resize_requested = false;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1501,7 +1515,6 @@ AllocatedBuffer VkEngine::createBuffer(size_t allocSize, VkBufferUsageFlags usag
   VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
   bufferInfo.pNext = nullptr;
   bufferInfo.size = allocSize;
-
   bufferInfo.usage = usage;
 
   VmaAllocationCreateInfo vmaallocInfo = {};

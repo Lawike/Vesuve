@@ -9,7 +9,7 @@ VulkanBackend::DescriptorSetLayout::DescriptorSetLayout(
   DescriptorLayoutBuilder builder;
   for (const auto binding : descriptorBindings)
   {
-    builder.addBinding(binding.binding, binding.type, binding.stage);
+    builder.addBinding(binding.binding, binding.type, binding.stage, binding.descriptorCount);
   }
   _handle = builder.build(device->getHandle());
 }

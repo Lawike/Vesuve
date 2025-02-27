@@ -32,21 +32,23 @@ void VulkanBackend::DescriptorSet::writeImage(
 }
 
 //--------------------------------------------------------------------------------------------------
-void VulkanBackend::DescriptorSet::writeBuffer(
+void VulkanBackend::DescriptorSet::writeBuffers(
   std::unique_ptr<Device>& device,
-  AllocatedBuffer& buffer,
+  std::vector<AllocatedBuffer>& buffers,
   uint32_t binding,
-  size_t size,
   size_t offset)
 {
-  VkDescriptorBufferInfo& info =
-    _bufferInfos.emplace_back(VkDescriptorBufferInfo{.buffer = buffer.buffer, .offset = offset, .range = size});
+  for (const auto& buffer : buffers)
+  {
+    _bufferInfos.emplace_back(VkDescriptorBufferInfo{.buffer = buffer.buffer, .offset = offset, .range = VK_WHOLE_SIZE});
+  }
+  VkDescriptorBufferInfo& info = _bufferInfos.at(_bufferInfos.size() - buffers.size());
 
   VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
 
   write.dstBinding = binding;
   write.dstSet = VK_NULL_HANDLE;  //left empty for now until we need to write it
-  write.descriptorCount = 1;
+  write.descriptorCount = buffers.size();
   write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   write.pBufferInfo = &info;
   write.dstSet = _handle;
