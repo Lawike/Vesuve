@@ -10,7 +10,7 @@ The only prerequisite is the [Vulkan SDK](https://vulkan.lunarg.com/) that must 
 This project uses CMake as a build system, there is a `CMakePresets.json` provided as a template to quickly get started.
 You'll have to fill the following empty `cacheVariables` :
 ```json
-"cacheVariables": {
+"environment": {
   ...
   "VULKAN_SDK": "",
   ...
