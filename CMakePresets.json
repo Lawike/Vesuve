@@ -10,6 +10,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_INSTALL_PREFIX": "./install-debug"
+        "SDL_LIBC": "ON"
       },
       "environment": {
         "VULKAN_SDK": ""
