@@ -18,3 +18,9 @@ You'll have to fill the following empty `cacheVariables` :
 ```
 And provide the path to the libraries.
 For the vulkan SDK provide the root directory, not the **Bin** that contains the executables.
+
+### Know issues
+When trying to debug shaders i encountered an issue :
+the executable wasn't able to find a specific DLL, i had to provide the directory in my PATH variable :
+`C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.40.33807\bin\Hostx64\x64`
+
