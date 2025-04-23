@@ -15,6 +15,8 @@
 #include <chrono>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
 #include <glm/packing.hpp>
 #include <set>
 #include <thread>
@@ -725,14 +727,9 @@ void VkEngine::updateScene()
   auto start = std::chrono::system_clock::now();
 
   _mainCamera.update();
-
-  _sceneData.aspectRatio = (float)_swapchain->getSwapchainExtent().width / (float)_swapchain->getSwapchainExtent().height;
   auto view = _mainCamera.getViewMatrix();
-
   _sceneData.view = view;
-  _sceneData.rtView =
-    view * glm::scale(glm::mat4(1.0f), glm::vec3(_sceneData.aspectRatio, -1, _sceneData.aspectRatio));  // Flip Y
-  _sceneData.invView = glm::inverse(_sceneData.rtView);
+  _sceneData.invView = glm::inverse(view);
   _sceneData.lightPosition = _mainLight.position;
   _sceneData.lightColor = _mainLight.color;
   _sceneData.lightPower = _mainLight.power;
@@ -742,12 +739,13 @@ void VkEngine::updateScene()
   _sceneData.screenGamma = _mainSurfaceProperties.screenGamma;
   _sceneData.shininess = _mainSurfaceProperties.shininess;
   // camera projection
-  _sceneData.proj =
-    glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
-  _sceneData.rtProj = _sceneData.proj;
-  _sceneData.invProj = glm::inverse(_sceneData.rtProj);
+  float fov = 70.f;
+  float aspect = (float)_windowExtent.width / (float)_windowExtent.height;
+  float near = 0.1f;
+  float far = 1000.0f;
+  _sceneData.proj = glm::perspective(fov, aspect, near, far);
   _sceneData.proj[1][1] *= -1;
-  //_sceneData.invProj[1][1] *= -1;
+  _sceneData.invProj = glm::inverse(_sceneData.proj);
 
   // invert the Y direction on projection matrix so that we are more similar
   // to opengl and gltf axis
@@ -932,17 +930,18 @@ void VkEngine::initDescriptors()
 //--------------------------------------------------------------------------------------------------
 void VkEngine::initRaytracingDescriptors()
 {
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {// Top level acceleration structure.
-                                                                   {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1},
-                                                                   // Image accumulation & output
-                                                                   {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}};
+  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
+    // Top level acceleration structure.
+    {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1},
+    // Image accumulation & output
+    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}};
   std::vector<DescriptorBinding> bindings{
     // Top level acceleration structure.
     {0, 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
     // Output image
     {1, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
     // vertex & index buffer descriptors
-    {2, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
+    {2, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR},
   };
   _raytracingDescriptorAllocator.init(_device->getHandle(), 1, sizes);
   _raytracingDescriptorSetLayout = std::make_unique<DescriptorSetLayout>(_device, bindings);
@@ -1218,8 +1217,9 @@ void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
   addressInfo.pNext = nullptr;
   addressInfo.buffer = _instancesBuffer.buffer;
   VkDeviceAddress instancesBufferAdress = vkGetBufferDeviceAddress(_device->getHandle(), &addressInfo);
-  _topAS.emplace_back(TopLevelAccelerationStructure{
-    _device, _raytracingProperties, _instancesBuffer, 0, instancesBufferAdress, static_cast<uint32_t>(instances.size())});
+  _topAS.emplace_back(
+    TopLevelAccelerationStructure{
+      _device, _raytracingProperties, _instancesBuffer, 0, instancesBufferAdress, static_cast<uint32_t>(instances.size())});
 
   // Allocate the structure memory.
   const auto total = GetTotalRequirements(_topAS);

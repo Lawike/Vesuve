@@ -57,10 +57,10 @@ void GLTFMetallicRoughness::buildPipelines(
   pipelineBuilder.setShaders(meshVertexShader, meshFragShader);
   pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-  pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+  pipelineBuilder.setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
   pipelineBuilder.setMultisamplingNone();
   pipelineBuilder.disableBlending();
-  pipelineBuilder.enableDepthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+  pipelineBuilder.enableDepthtest(true, VK_COMPARE_OP_LESS);
 
   //render format
   pipelineBuilder.setColorAttachmentFormat(drawImage.imageFormat);
