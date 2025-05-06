@@ -424,6 +424,18 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
     0,
     nullptr);
 
+  RaytracingPushConstant rtPushConstant{};
+  rtPushConstant.indexBufferAddress = _testMeshes[0]->meshBuffers.indexBufferAddress;
+  rtPushConstant.vertexBufferAddress = _testMeshes[0]->meshBuffers.vertexBufferAddress;
+
+  vkCmdPushConstants(
+    cmd,
+    _raytracingPipelineLayout->_handle,
+    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+    0,
+    sizeof(RaytracingPushConstant),
+    &rtPushConstant);
+
   // Describe the shader binding table.
   VkStridedDeviceAddressRegionKHR raygenShaderBindingTable = {};
   raygenShaderBindingTable.deviceAddress = _shaderBindingTable->_raygenShaderAddress;
@@ -666,7 +678,7 @@ GPUMeshBuffers VkEngine::uploadMesh(std::span<uint32_t> indices, std::span<Verte
   newSurface.vertexBuffer = this->createBuffer(
     vertexBufferSize,
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
     VMA_MEMORY_USAGE_AUTO);
   newSurface.vertexCount = vertices.size();
 
@@ -934,14 +946,13 @@ void VkEngine::initRaytracingDescriptors()
     // Top level acceleration structure.
     {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1},
     // Image accumulation & output
-    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}};
+    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+  };
   std::vector<DescriptorBinding> bindings{
     // Top level acceleration structure.
     {0, 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
     // Output image
     {1, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
-    // vertex & index buffer descriptors
-    {2, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR},
   };
   _raytracingDescriptorAllocator.init(_device->getHandle(), 1, sizes);
   _raytracingDescriptorSetLayout = std::make_unique<DescriptorSetLayout>(_device, bindings);
@@ -968,16 +979,6 @@ void VkEngine::updateRaytracingDescriptors()
 
   // Write output image
   _raytracingDescriptorSet->writeImage(_device, _drawImage, 1);
-
-  // Write vertex & index buffers
-  size_t totalSize = 0;
-  AllocatedBuffer vertexBuffer = _testMeshes[0]->meshBuffers.vertexBuffer;
-  totalSize += vertexBuffer.info.size;
-  AllocatedBuffer indexBuffer = _testMeshes[0]->meshBuffers.indexBuffer;
-  totalSize += indexBuffer.info.size;
-  std::vector<AllocatedBuffer> buffers = {vertexBuffer, indexBuffer};
-  _raytracingDescriptorSet->writeBuffers(_device, buffers, 2, 0);
-
   _raytracingDescriptorSet->updateSet(_device);
 }
 
@@ -1040,6 +1041,11 @@ void VkEngine::initRaytracingPipeline()
     _raytracingDescriptorSetLayout->_handle, _gpuSceneDataDescriptorLayout->_handle};
 
   std::vector<VkPushConstantRange> pushConstants;
+  VkPushConstantRange pc;
+  pc.offset = 0;
+  pc.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  pc.size = sizeof(RaytracingPushConstant);
+  pushConstants.emplace_back(pc);
   _raytracingPipelineLayout = std::make_unique<PipelineLayout>(_device, descriptors, pushConstants);
 
   // Load shaders

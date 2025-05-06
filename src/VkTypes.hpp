@@ -144,6 +144,12 @@ struct GPUDrawPushConstants
   VkDeviceAddress vertexBuffer;
 };
 
+struct RaytracingPushConstant
+{
+  VkDeviceAddress vertexBufferAddress;
+  VkDeviceAddress indexBufferAddress;
+};
+
 struct DrawContext;
 
 // base class for a renderable dynamic object

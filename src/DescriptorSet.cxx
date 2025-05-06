@@ -16,8 +16,9 @@ void VulkanBackend::DescriptorSet::writeImage(
   std::unique_ptr<Image>& image,
   uint32_t binding)
 {
-  VkDescriptorImageInfo& info = _imageInfos.emplace_back(VkDescriptorImageInfo{
-    .sampler = VK_NULL_HANDLE, .imageView = image->_handle.imageView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
+  VkDescriptorImageInfo& info = _imageInfos.emplace_back(
+    VkDescriptorImageInfo{
+      .sampler = VK_NULL_HANDLE, .imageView = image->_handle.imageView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
 
   VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
 
@@ -49,6 +50,27 @@ void VulkanBackend::DescriptorSet::writeBuffers(
   write.dstBinding = binding;
   write.dstSet = VK_NULL_HANDLE;  //left empty for now until we need to write it
   write.descriptorCount = buffers.size();
+  write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  write.pBufferInfo = &info;
+  write.dstSet = _handle;
+
+  _writes.push_back(write);
+}
+
+//--------------------------------------------------------------------------------------------------
+void VulkanBackend::DescriptorSet::writeBuffer(
+  std::unique_ptr<Device>& device,
+  AllocatedBuffer& buffer,
+  uint32_t binding,
+  size_t offset)
+{
+  VkDescriptorBufferInfo info = VkDescriptorBufferInfo{.buffer = buffer.buffer, .offset = offset, .range = VK_WHOLE_SIZE};
+
+  VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+
+  write.dstBinding = binding;
+  write.dstSet = VK_NULL_HANDLE;  //left empty for now until we need to write it
+  write.descriptorCount = 1;
   write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   write.pBufferInfo = &info;
   write.dstSet = _handle;

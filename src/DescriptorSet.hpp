@@ -18,6 +18,7 @@ namespace VulkanBackend
       std::unique_ptr<DescriptorSetLayout>& layout,
       DescriptorAllocatorGrowable& allocator);
     void writeImage(std::unique_ptr<Device>& device, std::unique_ptr<Image>& image, uint32_t binding = 0);
+    void writeBuffer(std::unique_ptr<Device>& device, AllocatedBuffer& buffer, uint32_t binding, size_t offset);
     void
     writeBuffers(std::unique_ptr<Device>& device, std::vector<AllocatedBuffer>& buffer, uint32_t binding, size_t offset);
     void writeAccelerationStructure(
