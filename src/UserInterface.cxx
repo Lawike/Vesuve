@@ -116,9 +116,8 @@ void UserInterface::displayBackground(VkEngine* engine)
     ImGui::InputFloat4("data2", (float*)&selected.data.data2);
     ImGui::InputFloat4("data3", (float*)&selected.data.data3);
     ImGui::InputFloat4("data4", (float*)&selected.data.data4);
-
-    ImGui::End();
   }
+  ImGui::End();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -161,9 +160,8 @@ void UserInterface::displayLighting(VkEngine* engine)
     ImGui::InputFloat("Specular coefficient", (float*)&engine->_mainSurfaceProperties.specularCoefficient);
     ImGui::InputFloat("Shininess", (float*)&engine->_mainSurfaceProperties.shininess);
     ImGui::InputFloat("Gamma", (float*)&engine->_mainSurfaceProperties.screenGamma);
-
-    ImGui::End();
   }
+  ImGui::End();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -172,6 +170,6 @@ void UserInterface::displayRenderingModeSelector(VkEngine* engine)
   if (ImGui::Begin("Rendering Mode Selector"))
   {
     ImGui::Checkbox("Raytracing", (bool*)&engine->_isRaytracingEnabled);
-    ImGui::End();
   }
+  ImGui::End();
 }
