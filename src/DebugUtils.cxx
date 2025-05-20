@@ -1,6 +1,5 @@
 #include "DebugUtils.hpp"
 
-
 VkResult DebugUtils::CreateDebugUtilsMessengerEXT(
   VkInstance instance,
   const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
