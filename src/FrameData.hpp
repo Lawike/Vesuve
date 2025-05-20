@@ -20,6 +20,7 @@ namespace VulkanBackend
     std::unique_ptr<CommandPool> _commandPool;
     std::unique_ptr<CommandBuffer> _mainCommandBuffer;
     std::unique_ptr<Fence> _renderFence;
+    std::unique_ptr<Fence> _presentFence;
     std::unique_ptr<Semaphore> _swapchainSemaphore, _renderSemaphore;
   };
 }  // namespace VulkanBackend

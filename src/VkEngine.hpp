@@ -156,7 +156,8 @@ class VkEngine
   DrawContext _mainDrawContext;
   std::unordered_map<std::string, std::shared_ptr<Node>> _loadedNodes;
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> _loadedScenes;
-  std::string _selectedNodeName = "Teapot";
+  std::string _selectedNodeName = "";
+  uint32_t _selectedMeshIndex = 0;
   std::string _selectedSceneName = "";
 
   Camera _mainCamera;
@@ -205,7 +206,7 @@ class VkEngine
   // run main loop
   void run();
 
-  void immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
+  void immediateSubmit(std::function<void(VkCommandBuffer)>&& function);
 
   GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
@@ -248,4 +249,8 @@ class VkEngine
   void createMemoryAllocator();
   void createDrawImage();
   void createDepthImage();
+
+  //Debug tools
+  MeshAsset createTestTriangleMesh();
+  MeshAsset createTestQuadMesh();
 };

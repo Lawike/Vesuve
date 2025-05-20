@@ -73,7 +73,7 @@ VkSemaphoreSubmitInfo vkinit::semaphoreSubmitInfo(VkPipelineStageFlags2 stageMas
 }
 
 //--------------------------------------------------------------------------------------------------
-VkCommandBufferSubmitInfo vkinit::commandBufferSubmitInfo(VkCommandBuffer cmd)
+VkCommandBufferSubmitInfo vkinit::commandBufferSubmitInfo(VkCommandBuffer& cmd)
 {
   VkCommandBufferSubmitInfo info{};
   info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
@@ -114,10 +114,10 @@ VkPresentInfoKHR vkinit::presentInfo()
   info.pNext = 0;
 
   info.swapchainCount = 0;
-  info.pSwapchains = nullptr;
-  info.pWaitSemaphores = nullptr;
+  info.pSwapchains = VK_NULL_HANDLE;
+  info.pWaitSemaphores = VK_NULL_HANDLE;
   info.waitSemaphoreCount = 0;
-  info.pImageIndices = nullptr;
+  info.pImageIndices = VK_NULL_HANDLE;
 
   return info;
 }

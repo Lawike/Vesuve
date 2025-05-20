@@ -25,6 +25,16 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
   rayTracingFeatures.pNext = nullptr;
   rayTracingFeatures.rayTracingPipeline = true;
 
+  // Enable fence for each swapchain image sempahore
+  VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT swapChainMaintenanceFeatures = {};
+  swapChainMaintenanceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT;
+  swapChainMaintenanceFeatures.swapchainMaintenance1 = true;
+
+  // Enable RT position fetch to avoid unpacking vertex
+  VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR RTPositionFetchFeatures{};
+  RTPositionFetchFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_POSITION_FETCH_FEATURES_KHR;
+  RTPositionFetchFeatures.rayTracingPositionFetch = true;
+
   //use vkbootstrap to select a gpu.
   //We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct features
   vkb::Instance vkbInstanceHandle = instance->getHandle();
@@ -36,8 +46,13 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
                  .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
                  .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
                  .add_required_extension(VK_KHR_SPIRV_1_4_EXTENSION_NAME)
+                 .add_required_extension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME)
+                 .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
+                 .add_required_extension(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME)
                  .add_required_extension_features(accelerationStructureFeatures)
                  .add_required_extension_features(rayTracingFeatures)
+                 .add_required_extension_features(swapChainMaintenanceFeatures)
+                 .add_required_extension_features(RTPositionFetchFeatures)
                  .set_surface(surface)
                  .select()
                  .value();

@@ -12,7 +12,7 @@ VulkanBackend::Raytracing::AccelerationStructure::AccelerationStructure()
 VkAccelerationStructureBuildSizesInfoKHR VulkanBackend::Raytracing::AccelerationStructure::getBuildSizes(
   std::unique_ptr<Device>& device,
   std::unique_ptr<RaytracingProperties>& properties,
-  const uint32_t* pMaxPrimitiveCounts)
+  std::vector<uint32_t>& pMaxPrimitiveCounts)
 {
   // Query both the size of the finished acceleration structure and the amount of scratch memory needed.
   VkAccelerationStructureBuildSizesInfoKHR sizeInfo = {};
@@ -23,7 +23,7 @@ VkAccelerationStructureBuildSizesInfoKHR VulkanBackend::Raytracing::Acceleration
     device->getHandle(),
     VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
     &_buildGeometryInfo,
-    pMaxPrimitiveCounts,
+    pMaxPrimitiveCounts.data(),
     &sizeInfo);
 
   // AccelerationStructure offset needs to be 256 bytes aligned (official Vulkan specs, don't ask me why).
@@ -53,6 +53,28 @@ void VulkanBackend::Raytracing::AccelerationStructure::createAccelerationStructu
   auto createAccelerationStructureKHR =
     vkloader::loadFunction<PFN_vkCreateAccelerationStructureKHR>(device->getHandle(), "vkCreateAccelerationStructureKHR");
   VK_CHECK(createAccelerationStructureKHR(device->getHandle(), &createInfo, nullptr, &_handle));
+}
+
+//--------------------------------------------------------------------------------------------------
+void VulkanBackend::Raytracing::AccelerationStructure::accelerationStructureBarrier(
+  VkCommandBuffer cmd,
+  VkAccessFlags src,
+  VkAccessFlags dst)
+{
+  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  barrier.srcAccessMask = src;
+  barrier.dstAccessMask = dst;
+  vkCmdPipelineBarrier(
+    cmd,
+    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+    0,
+    1,
+    &barrier,
+    0,
+    nullptr,
+    0,
+    nullptr);
 }
 
 //--------------------------------------------------------------------------------------------------

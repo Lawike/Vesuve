@@ -36,7 +36,7 @@ void SingleTimeCommand::end()
   submitInfo.pCommandBuffers = &buffer;
 
   vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(graphicsQueue);
+  VK_CHECK(vkQueueWaitIdle(graphicsQueue));
 
   vkFreeCommandBuffers(device, commandPool, 1, &buffer);
 }

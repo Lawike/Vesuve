@@ -31,7 +31,9 @@ VulkanBackend::Raytracing::TopLevelAccelerationStructure::TopLevelAccelerationSt
   _buildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
   _buildGeometryInfo.srcAccelerationStructure = nullptr;
 
-  _buildSizesInfo = getBuildSizes(device, properties, &instancesCount);
+  std::vector<uint32_t> maxInstancesCount = {instancesCount};
+
+  _buildSizesInfo = getBuildSizes(device, properties, maxInstancesCount);
 }
 
 //--------------------------------------------------------------------------------------------------

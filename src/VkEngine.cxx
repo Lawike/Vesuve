@@ -125,7 +125,6 @@ void VkEngine::init()
   this->initShaderBindingTable();
   this->initAccelerationStructures();
   this->updateRaytracingDescriptors();
-
   this->initMainCamera();
   this->initLight();
 
@@ -155,9 +154,9 @@ void VkEngine::cleanup()
     {
       //already written from before
       vkDestroyCommandPool(_device->getHandle(), _frames[i]->_commandPool->getHandle(), nullptr);
-
       //destroy sync objects
       vkDestroyFence(_device->getHandle(), _frames[i]->_renderFence->_handle, nullptr);
+      vkDestroyFence(_device->getHandle(), _frames[i]->_presentFence->_handle, nullptr);
       vkDestroySemaphore(_device->getHandle(), _frames[i]->_renderSemaphore->_handle, nullptr);
       vkDestroySemaphore(_device->getHandle(), _frames[i]->_swapchainSemaphore->_handle, nullptr);
 
@@ -288,15 +287,22 @@ void VkEngine::draw()
 
   VkSemaphoreSubmitInfo waitInfo = vkinit::semaphoreSubmitInfo(
     VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, this->getCurrentFrame()->_swapchainSemaphore->_handle);
+  std::string swapSemaphoreIndex = "swapchain semaphore index :" + std::to_string(swapchainImageIndex);
+  DebugUtils::SetObjectName(
+    this->getCurrentFrame()->_swapchainSemaphore->_handle, swapSemaphoreIndex.c_str(), _device->getHandle());
+
+
   VkSemaphoreSubmitInfo signalInfo =
     vkinit::semaphoreSubmitInfo(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, this->getCurrentFrame()->_renderSemaphore->_handle);
 
   VkSubmitInfo2 submit = vkinit::submitInfo(&cmdinfo, &signalInfo, &waitInfo);
 
   //submit command buffer to the queue and execute it.
-  // _renderFence will now block until the graphic commands finish execdution
+  // _renderFence will now block until the graphic commands finish execution
+
   VK_CHECK(vkQueueSubmit2(_device->getGraphicsQueue(), 1, &submit, this->getCurrentFrame()->_renderFence->_handle));
 
+  VK_CHECK(vkResetFences(_device->getHandle(), 1, &(this->getCurrentFrame()->_presentFence->_handle)));
 
   //prepare present
   // this will put the image we just rendered to into the visible window.
@@ -305,11 +311,20 @@ void VkEngine::draw()
   VkPresentInfoKHR presentInfo = vkinit::presentInfo();
   presentInfo.pSwapchains = &(_swapchain->_vkbHandle.swapchain);
   presentInfo.swapchainCount = 1;
-
   presentInfo.pWaitSemaphores = &(this->getCurrentFrame()->_renderSemaphore->_handle);
   presentInfo.waitSemaphoreCount = 1;
-
   presentInfo.pImageIndices = &swapchainImageIndex;
+
+  //DEBUG
+  std::string rendSemaphoreIndex = "Render semaphore index :" + std::to_string(swapchainImageIndex);
+  DebugUtils::SetObjectName(
+    this->getCurrentFrame()->_renderSemaphore->_handle, rendSemaphoreIndex.c_str(), _device->getHandle());
+
+  VkSwapchainPresentFenceInfoEXT presentFenceInfo = {};
+  presentFenceInfo.pFences = &(this->getCurrentFrame()->_presentFence->_handle);
+  presentFenceInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_FENCE_INFO_EXT;
+  presentFenceInfo.swapchainCount = 1;
+  presentInfo.pNext = &presentFenceInfo;
 
   VkResult presentResult = vkQueuePresentKHR(_device->getGraphicsQueue(), &presentInfo);
   if (e == VK_ERROR_OUT_OF_DATE_KHR)
@@ -319,6 +334,7 @@ void VkEngine::draw()
   }
   //increase the number of frames drawn
   _frameNumber++;
+  VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &(this->getCurrentFrame()->_presentFence->_handle), true, 9999999999));
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -425,8 +441,8 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
     nullptr);
 
   RaytracingPushConstant rtPushConstant{};
-  rtPushConstant.indexBufferAddress = _testMeshes[0]->meshBuffers.indexBufferAddress;
-  rtPushConstant.vertexBufferAddress = _testMeshes[0]->meshBuffers.vertexBufferAddress;
+  rtPushConstant.indexBufferAddress = _testMeshes[_selectedMeshIndex]->meshBuffers.indexBufferAddress;
+  rtPushConstant.vertexBufferAddress = _testMeshes[_selectedMeshIndex]->meshBuffers.vertexBufferAddress;
 
   vkCmdPushConstants(
     cmd,
@@ -832,7 +848,7 @@ void VkEngine::run()
   }
 }
 //--------------------------------------------------------------------------------------------------
-void VkEngine::immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function)
+void VkEngine::immediateSubmit(std::function<void(VkCommandBuffer)>&& function)
 {
   VK_CHECK(vkResetFences(_device->getHandle(), 1, &_immFence->_handle));
   VK_CHECK(vkResetCommandBuffer(_immCommandBuffer->getHandle(), 0));
@@ -903,7 +919,7 @@ void VkEngine::initDescriptors()
     {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
     {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
     {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
-  };
+    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}};
 
   _globalDescriptorAllocator.init(_device->getHandle(), 10, sizes);
 
@@ -950,7 +966,10 @@ void VkEngine::initRaytracingDescriptors()
   };
   std::vector<DescriptorBinding> bindings{
     // Top level acceleration structure.
-    {0, 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
+    {0,
+     1,
+     VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+     VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR},
     // Output image
     {1, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
   };
@@ -1031,7 +1050,7 @@ void VkEngine::initBackgroundPipelines()
 //--------------------------------------------------------------------------------------------------
 void VkEngine::initRaytracingPipeline()
 {
-  VkFormat imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+  VkFormat imageFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
   VkImageUsageFlags drawImageUsages{};
   drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
   VkExtent3D imageExtent{_windowExtent.width, _windowExtent.height, 1};
@@ -1091,20 +1110,23 @@ void VkEngine::initShaderBindingTable()
 void VkEngine::initAccelerationStructures()
 {
   std::unique_ptr<CommandPool> pool = std::make_unique<CommandPool>(_device);
-
-  // Use of 2 command buffer to avoid race conditions
   std::unique_ptr<SingleTimeCommand> cmdBottom =
     std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
+
   cmdBottom->begin();
+  DebugUtils::SetObjectName(
+    cmdBottom->buffer, "Single Time Bottom Acceleration structure command buffer", _device->getHandle().device);
   createBottomLevelStructures(cmdBottom->buffer);
   cmdBottom->end();
+
 
   std::unique_ptr<SingleTimeCommand> cmdTop =
     std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
   cmdTop->begin();
+  DebugUtils::SetObjectName(
+    cmdTop->buffer, "Single Time Top Acceleration structure command buffer", _device->getHandle().device);
   createTopLevelStructures(cmdTop->buffer);
   cmdTop->end();
-
   vkDestroyCommandPool(_device->getHandle(), pool->getHandle(), nullptr);
 }
 
@@ -1113,22 +1135,19 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
 {
   // Bottom level acceleration structure
   // Triangles via vertex buffers.
-  std::vector<VkAccelerationStructureGeometryKHR> geometries;
-  std::vector<VkAccelerationStructureBuildRangeInfoKHR> offsetInfos;
   uint32_t vertexOffset = 0;
   uint32_t indexOffset = 0;
-  VkDeviceSize asTotalSize{0};     // Memory size of all allocated BLAS
-  uint32_t nbCompactions{0};       // Nb of BLAS requesting compaction
-  VkDeviceSize maxScratchSize{0};  // Largest scratch size
   for (auto mesh : _testMeshes)
   {
+    std::vector<VkAccelerationStructureBuildRangeInfoKHR> offsetInfos;
+    std::vector<VkAccelerationStructureGeometryKHR> geometries;
     // Only triangle meshes for now
     VkAccelerationStructureGeometryTrianglesDataKHR triangles{
       VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
     triangles.pNext = nullptr;
     triangles.vertexData.deviceAddress = mesh->meshBuffers.vertexBufferAddress;
     triangles.vertexStride = sizeof(Vertex);
-    triangles.maxVertex = mesh->meshBuffers.vertexCount - 1;
+    triangles.maxVertex = mesh->meshBuffers.vertexCount;
     triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
     triangles.indexData.deviceAddress = mesh->meshBuffers.indexBufferAddress;
     triangles.indexType = VK_INDEX_TYPE_UINT32;
@@ -1138,6 +1157,7 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
     // General geometry container described as containing opaque triangles
     VkAccelerationStructureGeometryKHR geometry = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
     geometry.geometry.triangles = triangles;
+    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
     geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 
     geometries.push_back(geometry);
@@ -1149,31 +1169,43 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
     buildOffsetInfo.transformOffset = 0;
 
     offsetInfos.push_back(buildOffsetInfo);
+    _bottomAS.emplace_back(BottomLevelAccelerationStructure{_device, _raytracingProperties, geometries, offsetInfos});
 
     vertexOffset += mesh->meshBuffers.vertexCount * sizeof(Vertex);
     indexOffset += mesh->meshBuffers.indexCount * sizeof(uint32_t);
   }
-  _bottomAS.emplace_back(BottomLevelAccelerationStructure{_device, _raytracingProperties, geometries, offsetInfos});
 
   // Allocate memory for bottom acceleration structure
   const auto total = GetTotalRequirements(_bottomAS);
   _bottomBuffer = this->createBuffer(
     total.accelerationStructureSize,
     VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+    VMA_MEMORY_USAGE_AUTO);
+  DebugUtils::SetObjectName(_bottomBuffer.buffer, "BLAS structure buffer", _device->getHandle());
 
   _scratchBuffer = this->createBuffer(
     total.buildScratchSize,
     VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+    VMA_MEMORY_USAGE_AUTO);
+  DebugUtils::SetObjectName(_bottomBuffer.buffer, "BLAS scratch buffer", _device->getHandle());
 
   // Generate the structures.
   VkDeviceSize resultOffset = 0;
   VkDeviceSize scratchOffset = 0;
+
+  int index = 0;
   for (BottomLevelAccelerationStructure& accelerationStructure : _bottomAS)
   {
     accelerationStructure.Generate(_device, cmd, _scratchBuffer, scratchOffset, _bottomBuffer, resultOffset);
+    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+    vkCmdPipelineBarrier(
+      cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+
+    DebugUtils::SetObjectName(
+      accelerationStructure._handle, ("BLAS #" + std::to_string(index)).c_str(), _device->getHandle());
 
     resultOffset += accelerationStructure._buildSizesInfo.accelerationStructureSize;
     scratchOffset += accelerationStructure._buildSizesInfo.buildScratchSize;
@@ -1218,6 +1250,22 @@ void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
   _instancesBuffer = this->createBuffer(contentSize, allocateFlags, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
   // Create and copy instances buffer (do it in a separate one-time synchronous command buffer).
   this->copyBuffer(cmd, _instancesBuffer, instances);
+
+  // Make sure the copy of the instance buffer are copied before triggering the acceleration structure build
+  VkMemoryBarrier copyBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  copyBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  copyBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+  vkCmdPipelineBarrier(
+    cmd,
+    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+    0,
+    1,
+    &copyBarrier,
+    0,
+    nullptr,
+    0,
+    nullptr);
   VkBufferDeviceAddressInfo addressInfo = {};
   addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
   addressInfo.pNext = nullptr;
@@ -1241,6 +1289,22 @@ void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
 
   // Generate the structures.
   _topAS[0].Generate(_device, cmd, _topScratchBuffer, 0, _topBuffer, 0);
+
+  // Make sure to have the TLAS ready before using it
+  VkMemoryBarrier readyBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  readyBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  readyBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+  vkCmdPipelineBarrier(
+    cmd,
+    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+    0,
+    1,
+    &readyBarrier,
+    0,
+    nullptr,
+    0,
+    nullptr);
 
   _deletionQueue.push(
     [=]()
@@ -1337,8 +1401,13 @@ void VkEngine::initDefaultData()
   _defaultData = _metalRoughMaterial.writeMaterial(
     _device->getHandle(), MaterialPass::MainColor, materialResources, _globalDescriptorAllocator);
 
-  _testMeshes = vkloader::loadGltfMeshes(this, "../assets/scaled_teapot.glb").value();
+  //MeshAsset triangleMesh = createTestTriangleMesh();
+  //MeshAsset quadMesh = createTestQuadMesh();
 
+  _testMeshes = vkloader::loadGltfMeshes(this, "../assets/scaled_teapot.glb").value();
+  //_testMeshes.emplace_back(std::make_shared<MeshAsset>(std::move(triangleMesh)));
+  //_testMeshes.emplace_back(std::make_shared<MeshAsset>(std::move(quadMesh)));
+  //_testMeshes = vkloader::loadGltfMeshes(this, "../assets/cube.glb").value();
   for (auto& m : _testMeshes)
   {
     std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();
@@ -1481,7 +1550,7 @@ void VkEngine::destroyImage(const AllocatedImage& img)
 void VkEngine::createDrawImage()
 {
   //hardcoding the draw format to 32 bit float
-  VkFormat imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+  VkFormat imageFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
 
   VkImageUsageFlags drawImageUsages{};
   drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -1512,6 +1581,99 @@ void VkEngine::createDepthImage()
 
   _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _depthImage->_handle.image, _depthImage->_handle.allocation); });
   _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _depthImage->_handle.imageView, nullptr); });
+}
+
+//--------------------------------------------------------------------------------------------------
+MeshAsset VkEngine::createTestTriangleMesh()
+{
+  // Debug item
+  MeshAsset testTriangle;
+  // Vertices & indices
+  Vertex v0;
+  Vertex v1;
+  Vertex v2;
+  std::vector<Vertex> vertices;
+  v0.position = glm::vec3(0.f, 1.f, 0.f);
+  v0.normal = glm::vec3(0.f, 0.f, 1.f);
+  v0.uv_x = 0.5f;
+  v0.uv_y = 1.f;
+  v0.color = glm::vec4(1.f, 0.f, 0.f, 0.f);
+
+  v1.position = glm::vec3(1.f, 0.f, 0.f);
+  v1.normal = glm::vec3(0.f, 0.f, 1.f);
+  v1.uv_x = 1.f;
+  v1.uv_y = 0.f;
+  v1.color = glm::vec4(0.f, 1.f, 0.f, 0.f);
+
+  v2.position = glm::vec3(-1.f, 0.f, 0.f);
+  v2.normal = glm::vec3(0.f, 0.f, 1.f);
+  v2.uv_x = 0.f;
+  v2.uv_y = 0.f;
+  v2.color = glm::vec4(0.f, 1.f, 0.f, 0.f);
+
+  vertices = {v0, v1, v2};
+  std::vector<uint32_t> indices = {0, 1, 2};
+
+  testTriangle.meshBuffers = uploadMesh(indices, vertices);
+  testTriangle.name = "Triangle";
+
+  GeoSurface newSurface;
+  newSurface.startIndex = 0;
+  newSurface.count = 3;
+
+  testTriangle.surfaces.push_back(newSurface);
+
+  return testTriangle;
+}
+
+//--------------------------------------------------------------------------------------------------
+MeshAsset VkEngine::createTestQuadMesh()
+{
+  // Debug item
+  MeshAsset testQuad;
+  // Vertices & indices
+  Vertex v0;
+  Vertex v1;
+  Vertex v2;
+  Vertex v3;
+  std::vector<Vertex> vertices;
+  v0.position = glm::vec3(-1.f, 1.f, 0.f);
+  v0.normal = glm::vec3(0.f, 0.f, 1.f);
+  v0.uv_x = 0.f;
+  v0.uv_y = 0.f;
+  v0.color = glm::vec4(1.f, 0.f, 0.f, 0.f);
+
+  v1.position = glm::vec3(1.f, 1.f, 0.f);
+  v1.normal = glm::vec3(0.f, 0.f, 1.f);
+  v1.uv_x = 1.f;
+  v1.uv_y = 0.f;
+  v1.color = glm::vec4(0.f, 1.f, 0.f, 0.f);
+
+  v2.position = glm::vec3(-1.f, -1.f, 0.f);
+  v2.normal = glm::vec3(0.f, 0.f, 1.f);
+  v2.uv_x = 0.f;
+  v2.uv_y = 0.f;
+  v2.color = glm::vec4(0.f, 1.f, 0.f, 0.f);
+
+  v3.position = glm::vec3(1.f, -1.f, 0.f);
+  v3.normal = glm::vec3(0.f, 0.f, 1.f);
+  v3.uv_x = 0.f;
+  v3.uv_y = 0.f;
+  v3.color = glm::vec4(1.f, 1.f, 1.f, 0.f);
+
+  vertices = {v0, v1, v2, v3};
+  std::vector<uint32_t> indices = {0, 1, 2, 3, 2, 1};
+
+  testQuad.meshBuffers = uploadMesh(indices, vertices);
+  testQuad.name = "Quad";
+
+  GeoSurface newSurface;
+  newSurface.startIndex = 0;
+  newSurface.count = 6;
+
+  testQuad.surfaces.push_back(newSurface);
+
+  return testQuad;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1548,11 +1710,12 @@ template<class T> void VkEngine::copyBuffer(VkCommandBuffer cmd, AllocatedBuffer
   std::memcpy(data, content.data(), contentSize);
   vmaUnmapMemory(_allocator, stagingBuffer.allocation);
 
+
   // Copy the staging buffer to the device buffer.
   this->immediateSubmit(
     [&](VkCommandBuffer cmd)
     {
-      VkBufferCopy bufferCopy{0};
+      VkBufferCopy bufferCopy{};
       bufferCopy.dstOffset = 0;
       bufferCopy.srcOffset = 0;
       bufferCopy.size = contentSize;

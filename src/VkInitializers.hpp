@@ -11,7 +11,7 @@ namespace vkinit
   VkCommandBufferAllocateInfo commandBufferAllocateInfo(VkCommandPool pool, uint32_t count = 1);
 
   VkCommandBufferBeginInfo commandBufferBeginInfo(VkCommandBufferUsageFlags flags = 0);
-  VkCommandBufferSubmitInfo commandBufferSubmitInfo(VkCommandBuffer cmd);
+  VkCommandBufferSubmitInfo commandBufferSubmitInfo(VkCommandBuffer& cmd);
 
   VkFenceCreateInfo fenceCreateInfo(VkFenceCreateFlags flags = 0);
 

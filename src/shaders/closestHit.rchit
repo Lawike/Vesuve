@@ -2,64 +2,90 @@
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_buffer_reference : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_ray_tracing_position_fetch : require
 
+#include "raycommon.glsl"
+
+layout(location = 0) rayPayloadInEXT hitPayload prd;
+layout(location = 1) rayPayloadEXT bool isShadowed;
 struct Vertex {
-
 	vec3 position;
 	float uv_x;
 	vec3 normal;
 	float uv_y;
 	vec4 color;
-}; 
+};
 
 hitAttributeEXT vec2 attribs;
 
-layout(location = 0) rayPayloadInEXT vec3 hitValue;
-layout(buffer_reference, std430) readonly buffer VertexBuffer{ 
-	Vertex vertices[];
-};
-layout(buffer_reference, std430) readonly buffer IndexBuffer{ 
-	ivec3 indices[];
-};
-
-//push constants block
-layout( push_constant ) uniform constants
-{
-	VertexBuffer vertexBuffer;
-	IndexBuffer indexBuffer;
-} PushConstants;
-
 vec3 lcolor = vec3(1.0,0.0,0.0);
 float lpow = 5.0;
+vec3 lpos = vec3(10,10,10);
 
 void main()
 {
-  ivec3 ind = PushConstants.indexBuffer.indices[gl_PrimitiveID];
-  Vertex v0 = PushConstants.vertexBuffer.vertices[ind.x];
-  Vertex v1 = PushConstants.vertexBuffer.vertices[ind.y];
-  Vertex v2 = PushConstants.vertexBuffer.vertices[ind.z];
+  vec3 v0 = gl_HitTriangleVertexPositionsEXT[0];
+  vec3 v1 = gl_HitTriangleVertexPositionsEXT[1];
+  vec3 v2 = gl_HitTriangleVertexPositionsEXT[2];
 	
   const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
   // Computing the coordinates of the hit position
-  const vec3 position      = v0.position * barycentrics.x + v1.position * barycentrics.y + v2.position * barycentrics.z;
+  vec3 geoNormal = cross(v1 - v0, v2 - v0);
+  const vec3 position = v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
   const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(position, 1.0));  // Transforming the position to world space
 
   // Computing the normal at hit position
-  const vec3 normal      = v0.normal * barycentrics.x + v1.normal * barycentrics.y + v2.normal * barycentrics.z;
-  const vec3 worldNormal = normalize(vec3(normal * gl_WorldToObjectEXT));  // Transforming the normal to world space
-
+  const vec3 worldNormal = normalize(vec3(geoNormal * gl_WorldToObjectEXT));  // Transforming the normal to world space
   // Vector toward the light
   vec3  L;
   float lightIntensity = 20;
   float lightDistance  = 10000.0;
 	
-  vec3 lDir      = vec3(0.0,10.0,10.0) - worldPos;
+  vec3 lDir      = lpos - worldPos;
   lightDistance  = length(lDir);
-  lightIntensity = lightIntensity / (lightDistance * lightDistance);
-  L              = normalize(lDir);
+  float LightDSquare = (lightDistance * lightDistance);
+  if (LightDSquare != 0)
+  {
+    lightIntensity = lightIntensity / (lightDistance * lightDistance);
+  }
+  L = normalize(lDir);
 
+  // Blinn phong
   float NdotL = clamp(dot(worldNormal, L), 0.0, 1.0);
   vec3 D = lpow * (lcolor.xyz * NdotL);
-  hitValue = D * lightIntensity;
+  vec3  specular    = vec3(0);
+  float attenuation = 1;
+ /** if(dot(worldNormal, L) > 0)
+  {
+    float tMin   = 0.001;
+    float tMax   = lightDistance;
+    vec3  origin = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
+    vec3  rayDir = L;
+    uint  flags  = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+    isShadowed   = true;
+    traceRayEXT(topLevelAS,  // acceleration structure
+                flags,       // rayFlags
+                0xFF,        // cullMask
+                0,           // sbtRecordOffset
+                0,           // sbtRecordStride
+                0,           // missIndex
+                origin,      // ray origin
+                tMin,        // ray min range
+                rayDir,      // ray direction
+                tMax,        // ray max range
+                1            // payload (location = 1)
+    );
+    if(isShadowed)
+    {
+      attenuation = 0.3;
+    }
+    else {
+    // TODO Specular lighting
+    }
+  }**/
+  //
+  // Normal debug
+  prd.hitValue = D * lightIntensity;
 }

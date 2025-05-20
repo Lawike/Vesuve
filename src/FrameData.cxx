@@ -7,6 +7,7 @@ VulkanBackend::FrameData::FrameData(std::unique_ptr<Device>& device)
   _commandPool = std::make_unique<CommandPool>(device);
   _mainCommandBuffer = std::make_unique<CommandBuffer>(device, _commandPool);
   _renderFence = std::make_unique<Fence>(device);
+  _presentFence = std::make_unique<Fence>(device);
   _swapchainSemaphore = std::make_unique<Semaphore>(device);
   _renderSemaphore = std::make_unique<Semaphore>(device);
 

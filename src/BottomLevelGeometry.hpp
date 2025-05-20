@@ -10,10 +10,12 @@ namespace VulkanBackend::Raytracing
     {
       return _geometry.size();
     }
+    // Collection of geometries for the acceleration structure.
     const std::vector<VkAccelerationStructureGeometryKHR>& Geometry() const
     {
       return _geometry;
     }
+    // Build range information corresponding to each geometry.
     const std::vector<VkAccelerationStructureBuildRangeInfoKHR>& BuildOffsetInfo() const
     {
       return _buildOffsetInfo;

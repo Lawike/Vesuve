@@ -9,8 +9,9 @@ namespace VulkanBackend::Raytracing
     BottomLevelAccelerationStructure(
       std::unique_ptr<Device>& device,
       std::unique_ptr<RaytracingProperties>& properties,
-      std::vector<VkAccelerationStructureGeometryKHR> geometry,
-      std::vector<VkAccelerationStructureBuildRangeInfoKHR> offsetInfo);
+      std::vector<VkAccelerationStructureGeometryKHR>& geometries,
+      std::vector<VkAccelerationStructureBuildRangeInfoKHR>& offsetInfo);
+
     void Generate(
       std::unique_ptr<Device>& device,
       VkCommandBuffer commandBuffer,
@@ -20,6 +21,7 @@ namespace VulkanBackend::Raytracing
       const VkDeviceSize resultOffset);
    private:
     std::vector<VkAccelerationStructureGeometryKHR> _geometry;
+    // Build range information corresponding to each geometry.
     std::vector<VkAccelerationStructureBuildRangeInfoKHR> _offsetInfo;
   };
 }  // namespace VulkanBackend::Raytracing
