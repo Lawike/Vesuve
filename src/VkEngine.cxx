@@ -1071,6 +1071,7 @@ void VkEngine::initRaytracingPipeline()
   // Load shaders
   std::string raygenShader = "../shaders/raygen.rgen.spv";
   std::string missShader = "../shaders/miss.rmiss.spv";
+  std::string shadowMissShader = "../shaders/shadow.rmiss.spv";
   std::string closestHitShader = "../shaders/closestHit.rchit.spv";
   std::string proceduralClosestHitShader = "../shaders/proceduralClosestHit.rchit.spv";
   std::string proceduralIntersectionShader = "../shaders/proceduralIntersection.rint.spv";
@@ -1080,6 +1081,7 @@ void VkEngine::initRaytracingPipeline()
     _raytracingPipelineLayout,
     raygenShader,
     missShader,
+    shadowMissShader,
     closestHitShader,
     proceduralClosestHitShader,
     proceduralIntersectionShader);
@@ -1099,7 +1101,8 @@ void VkEngine::initShaderBindingTable()
 {
   _raytracingProperties = std::make_unique<RaytracingProperties>(_chosenGPU);
   const std::vector<ShaderBindingTable::Entry> rayGenPrograms = {{_raytracingPipeline->_raygenGroupIndex, {}}};
-  const std::vector<ShaderBindingTable::Entry> missPrograms = {{_raytracingPipeline->_missGroupIndex, {}}};
+  const std::vector<ShaderBindingTable::Entry> missPrograms = {
+    {_raytracingPipeline->_missGroupIndex, {}}, {{_raytracingPipeline->_shadowMissGroupIndex}, {}}};
   const std::vector<ShaderBindingTable::Entry> hitGroups = {
     {_raytracingPipeline->_triangleHitGroupIndex, {}}, {_raytracingPipeline->_proceduralHitGroupIndex, {}}};
   _shaderBindingTable = std::make_unique<ShaderBindingTable>(

@@ -14,12 +14,14 @@ namespace VulkanBackend
         std::unique_ptr<PipelineLayout>& layout,
         std::string raygenPath,
         std::string missPath,
+        std::string shadowMissäth,
         std::string closestHitShader,
         std::string proceduralClosestHitShader,
         std::string proceduralIntersectionShader);
       VkPipeline _handle;
       uint32_t _raygenGroupIndex;
       uint32_t _missGroupIndex;
+      uint32_t _shadowMissGroupIndex;
       uint32_t _triangleHitGroupIndex;
       uint32_t _proceduralHitGroupIndex;
 
@@ -31,6 +33,7 @@ namespace VulkanBackend
       std::vector<VkRayTracingShaderGroupCreateInfoKHR> _shaderGroups;
       VkShaderModule _raygenShader;
       VkShaderModule _missShader;
+      VkShaderModule _shadowMissShader;
       VkShaderModule _closestHitShader;
       VkShaderModule _proceduralClosestHitShader;
       VkShaderModule _proceduralIntersectionShader;

@@ -16,11 +16,11 @@ It is highly WIP and mostly a way for me to learn computer graphics and the API.
   - [x] Raygen shader
   - [x] Closest hit shader
   - [ ] Miss Shader
-### Dependencies
+## Dependencies
 Most of the dependencies are retrieved using CMake FetchContent. They should be downloaded when configuring the CMake project.
 The only prerequisite are [CMake](https://cmake.org/download/) and the [Vulkan SDK](https://vulkan.lunarg.com/) that must be installed on your environment.
 
-### Build Guide
+## Build Guide
 This project uses CMake as a build system, there is a `CMakePresets.json` provided as a template to quickly get started.
 You'll have to fill the following empty `cacheVariables` :
 ```json
@@ -38,7 +38,7 @@ Then build it using CMake, I personnally use the CMake integration from Visual S
 
 If you don't know how to use CMake please check this [ressource](https://cmake.org/cmake/help/latest/guide/tutorial/A%20Basic%20Starting%20Point.html)
 
-### Known issues
+## Known issues
 When trying to debug shaders I encountered an issue :
 the executable wasn't able to find a specific DLL, I had to provide the directory in my `PATH` variable :
 `C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.40.33807\bin\Hostx64\x64`
