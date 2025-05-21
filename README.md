@@ -14,7 +14,7 @@ It is highly WIP and mostly a way for me to learn computer graphics and the API.
     - [ ] BLAS
     - [ ] TLAS
   - [x] Raygen shader
-  - [ ] Closest hit shader
+  - [x] Closest hit shader
   - [ ] Miss Shader
 ### Dependencies
 Most of the dependencies are retrieved using CMake FetchContent. They should be downloaded when configuring the CMake project.

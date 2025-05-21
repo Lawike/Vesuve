@@ -937,7 +937,8 @@ void VkEngine::initDescriptors()
     {0,
      1,
      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_FRAGMENT_BIT}};
+     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+       VK_SHADER_STAGE_FRAGMENT_BIT}};
   _gpuSceneDataDescriptorLayout = std::make_unique<DescriptorSetLayout>(_device, sceneDataBindings);
 
   //allocate a descriptor set for our draw image

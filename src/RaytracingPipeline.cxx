@@ -24,15 +24,19 @@ VulkanBackend::Raytracing::RaytracingPipeline::RaytracingPipeline(
 
   VkRayTracingPipelineCreateInfoKHR pipelineInfo{};
   pipelineInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-  pipelineInfo.pNext = nullptr;
+  pipelineInfo.pNext = VK_NULL_HANDLE;
   pipelineInfo.flags = 0;
   pipelineInfo.stageCount = static_cast<uint32_t>(_shaderStages.size());
   pipelineInfo.pStages = _shaderStages.data();
   pipelineInfo.groupCount = static_cast<uint32_t>(_shaderGroups.size());
   pipelineInfo.pGroups = _shaderGroups.data();
-  pipelineInfo.maxPipelineRayRecursionDepth = 1;
+  // The ray tracing process can shoot rays from the camera, and a shadow ray can be shot from the
+  // hit points of the camera rays, hence a recursion level of 2. This number should be kept as low
+  // as possible for performance reasons. Even recursive ray tracing should be flattened into a loop
+  // in the ray generation to avoid deep recursion.
+  pipelineInfo.maxPipelineRayRecursionDepth = 2;
   pipelineInfo.layout = layout->_handle;
-  pipelineInfo.basePipelineHandle = nullptr;
+  pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
   pipelineInfo.basePipelineIndex = 0;
 
   auto createRayTracingPipelines =

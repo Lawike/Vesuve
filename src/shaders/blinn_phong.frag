@@ -38,7 +38,7 @@ void main()
 	vec3 halfAngle = normalize(viewDir + lightDir);
 	float NdotL = clamp(dot(normal, lightDir), 0.0, 1.0);
     float NdotH = clamp(dot(normal, halfAngle), 0.0, 1.0);
-	vec4 D = lpow * (lcolor * NdotL);
+	vec4 D = lpow/10 * (lcolor * NdotL);
 	float specularHighlight = pow(NdotH, shininess);
 	vec4 S = specularCoefficient * (lcolor * specularHighlight);
 
@@ -48,5 +48,7 @@ void main()
 	vec4 ambience = ambientCoefficient * ambientColor;
 	vec4 BlinnPhong = ambience + diffuseColor + specColor;
 	outFragColor = BlinnPhong;
+	// For debug
+	// outFragColor = vec4(inPos, 1);
 }
 

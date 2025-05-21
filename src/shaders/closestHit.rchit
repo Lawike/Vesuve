@@ -9,19 +9,31 @@
 
 layout(location = 0) rayPayloadInEXT hitPayload prd;
 layout(location = 1) rayPayloadEXT bool isShadowed;
-struct Vertex {
-	vec3 position;
-	float uv_x;
-	vec3 normal;
-	float uv_y;
-	vec4 color;
-};
+layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
+layout(set = 1, binding = 0) uniform SceneData
+{
+	mat4 view;
+	mat4 invView;
+	mat4 proj;
+	mat4 invProj;
+	mat4 viewproj;
+	vec4 ambientColor;
+	vec4 cameraPosition;
+	vec4 lightPosition;
+	vec4 lightColor;
+	float lightPower;
+	float specularCoefficient;
+	float ambientCoefficient;
+	float shininess;
+	float screenGamma;
+	float aspectRatio;
+} sceneData;
 
 hitAttributeEXT vec2 attribs;
 
-vec3 lcolor = vec3(1.0,0.0,0.0);
-float lpow = 5.0;
-vec3 lpos = vec3(10,10,10);
+vec3 lcolor = sceneData.lightColor.xyz;
+float lpow = sceneData.lightPower;
+vec3 lpos = sceneData.lightPosition.xyz;
 
 void main()
 {
@@ -55,9 +67,9 @@ void main()
   // Blinn phong
   float NdotL = clamp(dot(worldNormal, L), 0.0, 1.0);
   vec3 D = lpow * (lcolor.xyz * NdotL);
-  vec3  specular    = vec3(0);
+  vec3  specular    = vec3(0.,0.,0.);
   float attenuation = 1;
- /** if(dot(worldNormal, L) > 0)
+ if(dot(worldNormal, L) > 0)
   {
     float tMin   = 0.001;
     float tMax   = lightDistance;
@@ -82,10 +94,21 @@ void main()
       attenuation = 0.3;
     }
     else {
-    // TODO Specular lighting
+      if (specular.x == 0 && specular.y == 0 && specular.z == 0)
+      {
+        specular = vec3(1,1,1);
+      }
+      const float kShininess = sceneData.shininess;
+      const float kPi        = sceneData.specularCoefficient;
+      const float kEnergyConservation = (2.0 + kShininess) / (2.0 * kPi);
+      vec3        V                   = normalize(-gl_WorldRayDirectionEXT);
+      vec3        R                   = reflect(-L, worldNormal);
+      float       S            = kEnergyConservation * pow(max(dot(V, R), 0.0), kShininess);
+      specular = specular * S;
     }
-  }**/
+  }
   //
   // Normal debug
-  prd.hitValue = D * lightIntensity;
+  const vec3 A =  sceneData.ambientCoefficient * sceneData.ambientColor.xyz;
+  prd.hitValue = lightIntensity * attenuation * (D + specular + A);
 }
