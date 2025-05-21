@@ -1,7 +1,8 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
-#extension GL_EXT_buffer_reference : enable
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_scalar_block_layout : require
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_ray_tracing_position_fetch : require
 
@@ -31,25 +32,62 @@ layout(set = 1, binding = 0) uniform SceneData
 
 hitAttributeEXT vec2 attribs;
 
+struct Vertex {
+	vec3 position;
+	float uv_x;
+	vec3 normal;
+	float uv_y;
+	vec4 color;
+}; 
+
+layout(buffer_reference, scalar) readonly buffer VertexBuffer{ 
+	Vertex vertices[];
+};
+
+layout(buffer_reference, scalar) readonly buffer IndexBuffer{ 
+	uint indices[];
+};
+
+//push constants block
+layout( push_constant ) uniform constants
+{
+	VertexBuffer vertexBuffer;
+	IndexBuffer indexBuffer;
+} PushConstants;
+
 vec3 lcolor = sceneData.lightColor.xyz;
 float lpow = sceneData.lightPower;
 vec3 lpos = sceneData.lightPosition.xyz;
 
 void main()
 {
-  vec3 v0 = gl_HitTriangleVertexPositionsEXT[0];
-  vec3 v1 = gl_HitTriangleVertexPositionsEXT[1];
-  vec3 v2 = gl_HitTriangleVertexPositionsEXT[2];
-	
+  uint triIndex0 = PushConstants.indexBuffer.indices[gl_PrimitiveID*3 + 0];
+  uint triIndex1 = PushConstants.indexBuffer.indices[gl_PrimitiveID*3 + 1];
+  uint triIndex2 = PushConstants.indexBuffer.indices[gl_PrimitiveID*3 + 2];
+
+  Vertex vert0 = PushConstants.vertexBuffer.vertices[triIndex0];
+  Vertex vert1 = PushConstants.vertexBuffer.vertices[triIndex1];
+  Vertex vert2 = PushConstants.vertexBuffer.vertices[triIndex2];
+
+  vec3 v0 = vert0.position;
+  vec3 v1 = vert1.position;
+  vec3 v2 = vert2.position;
+
+  vec3 n0 = vert0.normal;
+  vec3 n1 = vert1.normal;
+  vec3 n2 = vert2.normal;
+
   const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
   // Computing the coordinates of the hit position
-  vec3 geoNormal = cross(v1 - v0, v2 - v0);
+  //vec3 geoNormal = cross(v1 - v0, v2 - v0);
+  vec3 normal = n0 * barycentrics.x + n1 * barycentrics.y + n2 * barycentrics.z;
+
   const vec3 position = v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
   const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(position, 1.0));  // Transforming the position to world space
 
   // Computing the normal at hit position
-  const vec3 worldNormal = normalize(vec3(geoNormal * gl_WorldToObjectEXT));  // Transforming the normal to world space
+  const vec3 worldNormal = normalize(vec3(normal * gl_WorldToObjectEXT));  // Transforming the normal to world space
   // Vector toward the light
   vec3  L;
   float lightIntensity = 20;

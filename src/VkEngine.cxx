@@ -441,8 +441,8 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
     nullptr);
 
   RaytracingPushConstant rtPushConstant{};
-  rtPushConstant.indexBufferAddress = _testMeshes[_selectedMeshIndex]->meshBuffers.indexBufferAddress;
   rtPushConstant.vertexBufferAddress = _testMeshes[_selectedMeshIndex]->meshBuffers.vertexBufferAddress;
+  rtPushConstant.indexBufferAddress = _testMeshes[_selectedMeshIndex]->meshBuffers.indexBufferAddress;
 
   vkCmdPushConstants(
     cmd,
@@ -1395,7 +1395,7 @@ void VkEngine::initDefaultData()
   _mainSurfaceProperties.ambientCoefficient = 0.1;
   _mainSurfaceProperties.screenGamma = 2.2;
   _mainSurfaceProperties.shininess = 8.0;
-  _mainSurfaceProperties.specularCoefficient = 0.5;
+  _mainSurfaceProperties.specularCoefficient = 3.14;
 
   _deletionQueue.push([=, this]() { destroyBuffer(materialConstants); });
 
@@ -1440,9 +1440,9 @@ void VkEngine::initMainCamera()
 //--------------------------------------------------------------------------------------------------
 void VkEngine::initLight()
 {
-  _mainLight.position = glm::vec4(0.0f, 10.0f, 0.0f, 0.0f);
+  _mainLight.position = glm::vec4(5.0f, 5.0f, 5.0f, 0.0f);
   _mainLight.color = glm::vec4(1.0f);
-  _mainLight.power = 0.1;
+  _mainLight.power = 1;
 }
 
 //--------------------------------------------------------------------------------------------------
