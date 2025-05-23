@@ -158,7 +158,7 @@ class VkEngine
   DrawContext _mainDrawContext;
   std::unordered_map<std::string, std::shared_ptr<Node>> _loadedNodes;
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> _loadedScenes;
-  std::string _selectedNodeName = "";
+  std::string _selectedNodeName = "Teapot";
   uint32_t _selectedMeshIndex = 0;
   std::string _selectedSceneName = "";
 

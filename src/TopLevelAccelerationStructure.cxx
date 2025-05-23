@@ -72,7 +72,8 @@ VkAccelerationStructureInstanceKHR VulkanBackend::Raytracing::TopLevelAccelerati
   BottomLevelAccelerationStructure& bottomLevelAs,
   const glm::mat4& transform,
   const uint32_t instanceId,
-  const uint32_t hitGroupId)
+  const uint32_t hitGroupId,
+  const uint32_t mask)
 {
   VkAccelerationStructureDeviceAddressInfoKHR addressInfo = {};
   addressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -83,8 +84,7 @@ VkAccelerationStructureInstanceKHR VulkanBackend::Raytracing::TopLevelAccelerati
 
   VkAccelerationStructureInstanceKHR instance = {};
   instance.instanceCustomIndex = instanceId;
-  instance.mask =
-    0xFF;  // The visibility mask is always set of 0xFF, but if some instances would need to be ignored in some cases, this flag should be passed by the application.
+  instance.mask = mask;
   instance.instanceShaderBindingTableRecordOffset =
     hitGroupId;  // Set the hit group index, that will be used to find the shader code to execute when hitting the geometry.
   instance.flags =

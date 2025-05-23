@@ -1250,8 +1250,10 @@ void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
 
   for (auto mesh : _testMeshes)
   {
+    uint32_t mask = mesh->name == _selectedNodeName ? 0xFF : 0x0;
+    ;  // The visibility mask is always set of 0xFF, but if some instances would need to be ignored in some cases, this flag should be passed by the application.
     instances.push_back(
-      TopLevelAccelerationStructure::CreateInstance(_device, _bottomAS[instanceId], glm::mat4(1), instanceId, 0));
+      TopLevelAccelerationStructure::CreateInstance(_device, _bottomAS[instanceId], glm::mat4(1), instanceId, 0, mask));
     instanceId++;
   }
   const VkMemoryAllocateFlags allocateFlags = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
@@ -1419,7 +1421,7 @@ void VkEngine::initDefaultData()
   _testMeshes = vkloader::loadGltfMeshes(this, "../assets/scaled_teapot.glb").value();
   //_testMeshes.emplace_back(std::make_shared<MeshAsset>(std::move(triangleMesh)));
   //_testMeshes.emplace_back(std::make_shared<MeshAsset>(std::move(quadMesh)));
-  //_testMeshes = vkloader::loadGltfMeshes(this, "../assets/cube.glb").value();
+  _testMeshes.emplace_back(vkloader::loadGltfMeshes(this, "../assets/cube.glb").value().at(0));
   for (auto& m : _testMeshes)
   {
     std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();

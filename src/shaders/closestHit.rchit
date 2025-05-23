@@ -28,6 +28,7 @@ layout(set = 1, binding = 0) uniform SceneData
 	float shininess;
 	float screenGamma;
 	float aspectRatio;
+    uint frameIndex;
 } sceneData;
 
 hitAttributeEXT vec2 attribs;

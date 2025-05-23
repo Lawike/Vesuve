@@ -26,7 +26,8 @@ namespace VulkanBackend::Raytracing
       BottomLevelAccelerationStructure& bottomLevelAs,
       const glm::mat4& transform,
       const uint32_t instanceId,
-      const uint32_t hitGroupId);
+      const uint32_t hitGroupId,
+      const uint32_t mask);
    private:
     uint32_t _instancesCount;
     VkAccelerationStructureGeometryInstancesDataKHR _instances{};
