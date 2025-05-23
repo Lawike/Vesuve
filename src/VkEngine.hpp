@@ -83,7 +83,9 @@ class VkEngine
   bool _isInitialized{false};
   int _frameNumber{0};
   bool _stopRendering{false};
-  bool _isRaytracingEnabled{false};
+  bool _isRaytracingEnabled{true};
+  bool _isPreviousFrameRT{false};
+  uint32_t maxNbOfFramesRT = 10;
   VkExtent2D _windowExtent{1700, 900};
 
   std::unique_ptr<Window> _window;
@@ -224,6 +226,7 @@ class VkEngine
     VkImageUsageFlags usage,
     bool mipmapped = false);
   void destroyImage(const AllocatedImage& img);
+  void resetFrame();
 
  private:
   void initVulkan();
@@ -249,6 +252,7 @@ class VkEngine
   void createMemoryAllocator();
   void createDrawImage();
   void createDepthImage();
+  void updateFrame();
 
   //Debug tools
   MeshAsset createTestTriangleMesh();

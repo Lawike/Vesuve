@@ -90,6 +90,7 @@ void UserInterface::display(VkEngine* engine)
   ImGui::Text("update time %f ms", engine->_stats.sceneUpdateTime);
   ImGui::Text("triangles %i", engine->_stats.triangleCount);
   ImGui::Text("draws %i", engine->_stats.drawcallCount);
+  ImGui::Text("frame index %i", engine->_frameNumber);
   ImGui::End();
 
   displayBackground(engine);

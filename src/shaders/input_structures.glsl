@@ -1,3 +1,4 @@
+#version 460
 
 layout(set = 0, binding = 0) uniform SceneData
 {
@@ -16,6 +17,7 @@ layout(set = 0, binding = 0) uniform SceneData
 	float shininess;
 	float screenGamma;
 	float aspectRatio;
+	uint frameIndex;
 } sceneData;
 
 /*

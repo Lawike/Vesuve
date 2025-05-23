@@ -195,6 +195,11 @@ void VkEngine::draw()
 {
   //wait until the gpu has finished rendering the last frame. Timeout of 1 second
   VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &this->getCurrentFrame()->_renderFence->_handle, true, 1000000000));
+  if (_isRaytracingEnabled != _isPreviousFrameRT)
+  {
+    this->resetFrame();
+  }
+  this->updateFrame();
 
   this->getCurrentFrame()->_deletionQueue.flush();
   this->getCurrentFrame()->_frameDescriptors.clearPools(_device->getHandle());
@@ -332,8 +337,6 @@ void VkEngine::draw()
     _resize_requested = true;
     return;
   }
-  //increase the number of frames drawn
-  _frameNumber++;
   VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &(this->getCurrentFrame()->_presentFence->_handle), true, 9999999999));
 }
 
@@ -616,28 +619,6 @@ void VkEngine::drawGeometry(VkCommandBuffer cmd)
 //--------------------------------------------------------------------------------------------------
 void VkEngine::drawMain(VkCommandBuffer cmd)
 {
-  ComputeEffect* effect = _backgroundEffects[_currentBackgroundEffect];
-
-  // bind the background compute pipeline
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect->pipeline);
-
-  // bind the descriptor set containing the draw image for the compute pipeline
-  vkCmdBindDescriptorSets(
-    cmd,
-    VK_PIPELINE_BIND_POINT_COMPUTE,
-    _gradientPipelineLayout->_handle,
-    0,
-    1,
-    &_drawImageDescriptors->_handle,
-    0,
-    nullptr);
-
-  vkCmdPushConstants(
-    cmd, _gradientPipelineLayout->_handle, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect->data);
-  // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
-  vkCmdDispatch(cmd, std::ceil(_windowExtent.width / 16.0), std::ceil(_windowExtent.height / 16.0), 1);
-
-
   VkRenderingAttachmentInfo colorAttachment =
     vkinit::attachmentInfo(_drawImage->_handle.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo depthAttachment =
@@ -661,10 +642,30 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
     _device, gpuSceneDataBuffer, sceneUniformData, _sceneData, 0, sizeof(GPUSceneData), 0);
 
   VkRenderingInfo renderInfo = vkinit::renderingInfo(_windowExtent, &colorAttachment, &depthAttachment);
-
   // Draw either blinn phong or ray tracing.
   if (!_isRaytracingEnabled)
   {
+    ComputeEffect* effect = _backgroundEffects[_currentBackgroundEffect];
+
+    // bind the background compute pipeline
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect->pipeline);
+
+    // bind the descriptor set containing the draw image for the compute pipeline
+    vkCmdBindDescriptorSets(
+      cmd,
+      VK_PIPELINE_BIND_POINT_COMPUTE,
+      _gradientPipelineLayout->_handle,
+      0,
+      1,
+      &_drawImageDescriptors->_handle,
+      0,
+      nullptr);
+
+    vkCmdPushConstants(
+      cmd, _gradientPipelineLayout->_handle, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect->data);
+    // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
+    vkCmdDispatch(cmd, std::ceil(_windowExtent.width / 16.0), std::ceil(_windowExtent.height / 16.0), 1);
+
     vkCmdBeginRendering(cmd, &renderInfo);
     auto start = std::chrono::system_clock::now();
 
@@ -675,10 +676,15 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
     _stats.meshDrawTime = elapsed.count() / 1000.f;
 
     vkCmdEndRendering(cmd);
+    _isPreviousFrameRT = false;
   }
   else
   {
-    this->drawRaytracing(cmd);
+    if (_frameNumber < maxNbOfFramesRT)
+    {
+      this->drawRaytracing(cmd);
+    }
+    _isPreviousFrameRT = true;
   }
 }
 
@@ -781,6 +787,7 @@ void VkEngine::updateScene()
 
   //some default lighting parameters
   _sceneData.ambientColor = glm::vec4(.1f);
+  _sceneData.frameIndex = _frameNumber;
 
 
   if (!_selectedNodeName.empty())
@@ -824,6 +831,7 @@ void VkEngine::run()
     }
     if (_resize_requested)
     {
+      resetFrame();
       resizeSwapchain();
     }
     //do not draw if we are minimized
@@ -1585,6 +1593,27 @@ void VkEngine::createDepthImage()
 
   _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _depthImage->_handle.image, _depthImage->_handle.allocation); });
   _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _depthImage->_handle.imageView, nullptr); });
+}
+
+//--------------------------------------------------------------------------------------------------
+void VkEngine::resetFrame()
+{
+  _frameNumber = -1;
+}
+
+//--------------------------------------------------------------------------------------------------
+void VkEngine::updateFrame()
+{
+  static glm::mat4 refCamMatrix;
+
+  const auto& m = _mainCamera.getViewMatrix();
+
+  if (refCamMatrix != m)
+  {
+    resetFrame();
+    refCamMatrix = m;
+  }
+  _frameNumber++;
 }
 
 //--------------------------------------------------------------------------------------------------

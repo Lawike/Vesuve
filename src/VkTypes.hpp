@@ -103,8 +103,10 @@ struct GPUSceneData
   float ambientCoefficient;
   float shininess;
   float screenGamma;
+  float aspectRatio;
+  uint32_t frameIndex;
   // For 256 bytes alignment
-  float extra[26];
+  float extra[24];
 };
 
 enum class MaterialPass : uint8_t
