@@ -380,6 +380,17 @@ void VkEngine::drawBackground(VkCommandBuffer cmd)
 //--------------------------------------------------------------------------------------------------
 void VkEngine::drawRaytracing(VkCommandBuffer cmd)
 {
+  if (_selectedNodeName != _lastSelectedNodeName)
+  {
+    int foundIndex = _selectedMeshIndex;
+    for (int i = 0; i < _testMeshes.size() && foundIndex == _selectedMeshIndex; i++)
+    {
+      foundIndex = _selectedNodeName == _testMeshes[i]->name ? i : _selectedMeshIndex;
+    }
+    _selectedMeshIndex = foundIndex;
+    updateAccelerationStructure(_selectedMeshIndex, cmd);
+  }
+
   std::vector<VkDescriptorSet> descriptorSets{_raytracingDescriptorSet->_handle, _gpuSceneDataDescriptorSet->_handle};
 
   VkImageSubresourceRange subresourceRange = {};
@@ -683,6 +694,7 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
     if (_frameNumber < maxNbOfFramesRT)
     {
       this->drawRaytracing(cmd);
+      _lastSelectedNodeName = _selectedNodeName;
     }
     _isPreviousFrameRT = true;
   }
@@ -844,9 +856,9 @@ void VkEngine::run()
 
     UserInterface::display(this);
 
-    //our draw function
     this->updateScene();
 
+    //our draw function
     this->draw();
     //get clock again, compare with start clock
     auto end = std::chrono::system_clock::now();
@@ -1182,9 +1194,6 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
 
     offsetInfos.push_back(buildOffsetInfo);
     _bottomAS.emplace_back(BottomLevelAccelerationStructure{_device, _raytracingProperties, geometries, offsetInfos});
-
-    vertexOffset += mesh->meshBuffers.vertexCount * sizeof(Vertex);
-    indexOffset += mesh->meshBuffers.indexCount * sizeof(uint32_t);
   }
 
   // Allocate memory for bottom acceleration structure
@@ -1210,15 +1219,8 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
   for (BottomLevelAccelerationStructure& accelerationStructure : _bottomAS)
   {
     accelerationStructure.Generate(_device, cmd, _scratchBuffer, scratchOffset, _bottomBuffer, resultOffset);
-    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
-    vkCmdPipelineBarrier(
-      cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &barrier, 0, nullptr, 0, nullptr);
-
     DebugUtils::SetObjectName(
       accelerationStructure._handle, ("BLAS #" + std::to_string(index)).c_str(), _device->getHandle());
-
     resultOffset += accelerationStructure._buildSizesInfo.accelerationStructureSize;
     scratchOffset += accelerationStructure._buildSizesInfo.buildScratchSize;
   }
@@ -1241,9 +1243,6 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
 //--------------------------------------------------------------------------------------------------
 void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
 {
-  //Top level acceleration structure
-  std::vector<VkAccelerationStructureInstanceKHR> instances;
-
   // Hit group 0: triangles
   // Hit group 1: procedurals for now not implemented
   uint32_t instanceId = 0;
@@ -1252,18 +1251,18 @@ void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
   {
     uint32_t mask = mesh->name == _selectedNodeName ? 0xFF : 0x0;
     ;  // The visibility mask is always set of 0xFF, but if some instances would need to be ignored in some cases, this flag should be passed by the application.
-    instances.push_back(
+    _instances.push_back(
       TopLevelAccelerationStructure::CreateInstance(_device, _bottomAS[instanceId], glm::mat4(1), instanceId, 0, mask));
     instanceId++;
   }
   const VkMemoryAllocateFlags allocateFlags = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                               VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                                               VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-  const auto contentSize = sizeof(instances[0]) * instances.size();
+  const auto contentSize = sizeof(_instances[0]) * _instances.size();
 
   _instancesBuffer = this->createBuffer(contentSize, allocateFlags, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
   // Create and copy instances buffer (do it in a separate one-time synchronous command buffer).
-  this->copyBuffer(cmd, _instancesBuffer, instances);
+  this->copyBuffer(cmd, _instancesBuffer, _instances);
 
   // Make sure the copy of the instance buffer are copied before triggering the acceleration structure build
   VkMemoryBarrier copyBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
@@ -1287,7 +1286,7 @@ void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
   VkDeviceAddress instancesBufferAdress = vkGetBufferDeviceAddress(_device->getHandle(), &addressInfo);
   _topAS.emplace_back(
     TopLevelAccelerationStructure{
-      _device, _raytracingProperties, _instancesBuffer, 0, instancesBufferAdress, static_cast<uint32_t>(instances.size())});
+      _device, _raytracingProperties, _instancesBuffer, 0, instancesBufferAdress, static_cast<uint32_t>(_instances.size())});
 
   // Allocate the structure memory.
   const auto total = GetTotalRequirements(_topAS);
@@ -1418,10 +1417,11 @@ void VkEngine::initDefaultData()
   //MeshAsset triangleMesh = createTestTriangleMesh();
   //MeshAsset quadMesh = createTestQuadMesh();
 
-  _testMeshes = vkloader::loadGltfMeshes(this, "../assets/scaled_teapot.glb").value();
   //_testMeshes.emplace_back(std::make_shared<MeshAsset>(std::move(triangleMesh)));
   //_testMeshes.emplace_back(std::make_shared<MeshAsset>(std::move(quadMesh)));
   _testMeshes.emplace_back(vkloader::loadGltfMeshes(this, "../assets/cube.glb").value().at(0));
+  _testMeshes.emplace_back(vkloader::loadGltfMeshes(this, "../assets/scaled_teapot.glb").value().at(0));
+
   for (auto& m : _testMeshes)
   {
     std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();
@@ -1616,6 +1616,47 @@ void VkEngine::updateFrame()
     refCamMatrix = m;
   }
   _frameNumber++;
+}
+
+//--------------------------------------------------------------------------------------------------
+// Make the desired instance of the TLAS visible and hides every other
+void VkEngine::updateAccelerationStructure(uint32_t instanceIndex, VkCommandBuffer cmd)
+{
+  // Update mask
+  for (int i = 0; i < _instances.size(); i++)
+  {
+    _instances[i].mask = i == instanceIndex ? 0xFF : 0x00;
+  }
+
+  // Re-upload to GPU
+  this->copyBuffer(cmd, _instancesBuffer, _instances);
+
+  VkAccelerationStructureBuildGeometryInfoKHR buildInfo = {};
+  buildInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+  buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+  buildInfo.flags =
+    VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+  buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
+  buildInfo.srcAccelerationStructure = _topAS[0]._handle;
+  buildInfo.dstAccelerationStructure = _topAS[0]._handle;
+  buildInfo.geometryCount = 1;
+  buildInfo.pGeometries = &_topAS[0]._topASGeometry;
+  buildInfo.scratchData = _topAS[0]._buildGeometryInfo.scratchData;
+
+  VkAccelerationStructureBuildRangeInfoKHR buildRangeInfo = {};
+  buildRangeInfo.primitiveCount = _topAS[0]._instancesCount;
+  buildRangeInfo.primitiveOffset = 0;
+  buildRangeInfo.firstVertex = 0;
+  buildRangeInfo.transformOffset = 0;
+  const VkAccelerationStructureBuildRangeInfoKHR* pBuildRangeInfo = &buildRangeInfo;
+
+  auto cmdBuildAccelerationStructuresKHR = vkloader::loadFunction<PFN_vkCmdBuildAccelerationStructuresKHR>(
+    _device->getHandle(), "vkCmdBuildAccelerationStructuresKHR");
+  cmdBuildAccelerationStructuresKHR(cmd, 1, &buildInfo, &pBuildRangeInfo);
+  _topAS[0].accelerationStructureBarrier(
+    cmd,
+    VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+    VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
 }
 
 //--------------------------------------------------------------------------------------------------

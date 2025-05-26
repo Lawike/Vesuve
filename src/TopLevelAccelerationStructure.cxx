@@ -64,6 +64,10 @@ void VulkanBackend::Raytracing::TopLevelAccelerationStructure::Generate(
   auto cmdBuildAccelerationStructuresKHR = vkloader::loadFunction<PFN_vkCmdBuildAccelerationStructuresKHR>(
     device->getHandle(), "vkCmdBuildAccelerationStructuresKHR");
   cmdBuildAccelerationStructuresKHR(commandBuffer, 1, &_buildGeometryInfo, &pBuildOffsetInfo);
+  accelerationStructureBarrier(
+    commandBuffer,
+    VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+    VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
 }
 
 //--------------------------------------------------------------------------------------------------

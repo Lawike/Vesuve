@@ -10,9 +10,9 @@ It is highly WIP and mostly a way for me to learn computer graphics and the API.
 - [x] Point Light
 - [x] Blinn Phong lighting
 - [ ] Ray tracing pipeline (WIP)
-  - [ ] Acceleration structure
-    - [ ] BLAS
-    - [ ] TLAS
+  - [x] Acceleration structure
+    - [x] BLAS
+    - [x] TLAS
   - [x] Raygen shader
   - [x] Closest hit shader
   - [x] Miss Shader

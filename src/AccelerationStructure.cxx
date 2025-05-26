@@ -4,7 +4,7 @@
 //--------------------------------------------------------------------------------------------------
 VulkanBackend::Raytracing::AccelerationStructure::AccelerationStructure()
 {
-  _flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+  _flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
   _handle = VK_NULL_HANDLE;
 }
 

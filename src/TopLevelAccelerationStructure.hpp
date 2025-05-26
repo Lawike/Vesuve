@@ -28,9 +28,10 @@ namespace VulkanBackend::Raytracing
       const uint32_t instanceId,
       const uint32_t hitGroupId,
       const uint32_t mask);
-   private:
-    uint32_t _instancesCount;
-    VkAccelerationStructureGeometryInstancesDataKHR _instances{};
     VkAccelerationStructureGeometryKHR _topASGeometry{};
+    uint32_t _instancesCount;
+
+   private:
+    VkAccelerationStructureGeometryInstancesDataKHR _instances{};
   };
 }  // namespace VulkanBackend::Raytracing

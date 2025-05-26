@@ -158,7 +158,8 @@ class VkEngine
   DrawContext _mainDrawContext;
   std::unordered_map<std::string, std::shared_ptr<Node>> _loadedNodes;
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> _loadedScenes;
-  std::string _selectedNodeName = "Teapot";
+  std::string _selectedNodeName = "Cube";
+  std::string _lastSelectedNodeName = "Cube";
   uint32_t _selectedMeshIndex = 0;
   std::string _selectedSceneName = "";
 
@@ -182,6 +183,7 @@ class VkEngine
   std::unique_ptr<DescriptorSet> _raytracingDescriptorSet;
   std::vector<TopLevelAccelerationStructure> _topAS;
   std::vector<BottomLevelAccelerationStructure> _bottomAS;
+  std::vector<VkAccelerationStructureInstanceKHR> _instances;
   AllocatedBuffer _bottomBuffer;
   AllocatedBuffer _scratchBuffer;
   AllocatedBuffer _topBuffer;
@@ -253,6 +255,7 @@ class VkEngine
   void createDrawImage();
   void createDepthImage();
   void updateFrame();
+  void updateAccelerationStructure(uint32_t index, VkCommandBuffer cmd);
 
   //Debug tools
   MeshAsset createTestTriangleMesh();
