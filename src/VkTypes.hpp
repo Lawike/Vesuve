@@ -78,7 +78,7 @@ struct DeletionQueue
   }
 };
 
-struct GPUGLTFMaterial
+struct alignas(16) GPUGLTFMaterial
 {
   glm::vec4 colorFactors;
   glm::vec4 metal_rough_factors;
@@ -87,7 +87,7 @@ struct GPUGLTFMaterial
 
 static_assert(sizeof(GPUGLTFMaterial) == 256);
 
-struct GPUSceneData
+struct alignas(16) GPUSceneData
 {
   glm::mat4 view;
   glm::mat4 invView;
@@ -105,9 +105,11 @@ struct GPUSceneData
   float screenGamma;
   float aspectRatio;
   uint32_t frameIndex;
-  // For 256 bytes alignment
+  // padding for 256 bytes alignment
   float extra[24];
 };
+
+static_assert(sizeof(GPUSceneData) == 512);
 
 enum class MaterialPass : uint8_t
 {

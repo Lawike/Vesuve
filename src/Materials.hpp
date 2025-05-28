@@ -10,13 +10,16 @@ class GLTFMetallicRoughness
 
   VkDescriptorSetLayout _materialLayout;
 
-  struct MaterialConstants
+  struct alignas(16) MaterialConstants
   {
     glm::vec4 colorFactors;
     glm::vec4 metalRoughFactors;
+    float transparency;
     //padding, we need it anyway for uniform buffers (256 bytes alignement)
-    glm::vec4 extra[14];
+    glm::vec4 extra[13];
   };
+
+  static_assert(sizeof(MaterialConstants) == 256);
 
   struct MaterialResources
   {
