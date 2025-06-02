@@ -9,7 +9,7 @@
 #include "raycommon.glsl"
 
 layout(location = 0) rayPayloadInEXT hitPayload prd;
-layout(location = 1) rayPayloadEXT bool isShadowed;
+layout(location = 1) rayPayloadEXT shadowPayload prdShadow;
 layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
 layout(set = 1, binding = 0) uniform SceneData
 {
@@ -112,20 +112,22 @@ void main()
     vec3  origin = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
     vec3  rayDir = L;
     uint  flags  = gl_RayFlagsSkipClosestHitShaderEXT;
-    isShadowed   = true;
+    prdShadow.isHit = true;
+    prdShadow.seed  = prd.seed;
     traceRayEXT(topLevelAS,  // acceleration structure
                 flags,       // rayFlags
                 0xFF,        // cullMask
-                0,           // sbtRecordOffset
+                1,           // sbtRecordOffset
                 0,           // sbtRecordStride
-                0,           // missIndex
+                1,           // missIndex
                 origin,      // ray origin
                 tMin,        // ray min range
                 rayDir,      // ray direction
                 tMax,        // ray max range
                 1            // payload (location = 1)
     );
-    if(isShadowed)
+    prd.seed = prdShadow.seed; 
+    if(prdShadow.isHit)
     {
       attenuation = 0.3;
     }

@@ -22,3 +22,9 @@ struct Material {
 	uint matIndex;
 	vec3 _padding;
 };
+
+struct shadowPayload
+{
+  bool isHit;
+  uint seed;
+};

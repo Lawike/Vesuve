@@ -9,11 +9,12 @@
       "binaryDir": "./build-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_INSTALL_PREFIX": "./install-debug"
+        "CMAKE_INSTALL_PREFIX": "./install-debug",
         "SDL_LIBC": "ON"
       },
       "environment": {
-        "VULKAN_SDK": ""
+        "VULKAN_SDK": "F:/Developement/Vulkan_1_4",
+        "NV_ALLOW_RAYTRACING_VALIDATION": "1"
       }
     }
   ],

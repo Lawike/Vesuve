@@ -1095,9 +1095,11 @@ void VkEngine::initRaytracingPipeline()
   std::string missShader = "../shaders/miss.rmiss.spv";
   std::string shadowMissShader = "../shaders/shadow.rmiss.spv";
   std::string closestHitShader = "../shaders/closestHit.rchit.spv";
-  std::string anyHitShader = "../shaders/anyHit.rahit.spv";
-  std::string proceduralClosestHitShader = "../shaders/proceduralClosestHit.rchit.spv";
-  std::string proceduralIntersectionShader = "../shaders/proceduralIntersection.rint.spv";
+  std::string anyHitShader0 = "../shaders/anyHit0.rahit.spv";
+  std::string anyHitShader1 = "../shaders/anyHit1.rahit.spv";
+
+  //std::string proceduralClosestHitShader = "../shaders/proceduralClosestHit.rchit.spv";
+  //std::string proceduralIntersectionShader = "../shaders/proceduralIntersection.rint.spv";
 
   _raytracingPipeline = std::make_unique<RaytracingPipeline>(
     _device,
@@ -1106,9 +1108,11 @@ void VkEngine::initRaytracingPipeline()
     missShader,
     shadowMissShader,
     closestHitShader,
-    anyHitShader,
+    anyHitShader0,
+    anyHitShader1
+    /**,
     proceduralClosestHitShader,
-    proceduralIntersectionShader);
+    proceduralIntersectionShader*/);
 
   _deletionQueue.push(
     [=]()
@@ -1124,13 +1128,14 @@ void VkEngine::initRaytracingPipeline()
 void VkEngine::initShaderBindingTable()
 {
   _raytracingProperties = std::make_unique<RaytracingProperties>(_chosenGPU);
-  const std::vector<ShaderBindingTable::Entry> rayGenPrograms = {{_raytracingPipeline->_raygenGroupIndex, {}}};
-  const std::vector<ShaderBindingTable::Entry> missPrograms = {
+  const std::vector<ShaderBindingTable::Entry> rayGenGroups = {{_raytracingPipeline->_raygenGroupIndex, {}}};
+  const std::vector<ShaderBindingTable::Entry> missGroups = {
     {_raytracingPipeline->_missGroupIndex, {}}, {{_raytracingPipeline->_shadowMissGroupIndex}, {}}};
   const std::vector<ShaderBindingTable::Entry> hitGroups = {
-    {_raytracingPipeline->_triangleHitGroupIndex, {}}, {_raytracingPipeline->_proceduralHitGroupIndex, {}}};
+    {_raytracingPipeline->_triangleHitGroupIndex, {}}, {_raytracingPipeline->_anyHitGroupIndex, {}},
+    /** {_raytracingPipeline->_proceduralHitGroupIndex, {}}*/};
   _shaderBindingTable = std::make_unique<ShaderBindingTable>(
-    _device, _allocator, _raytracingProperties, _raytracingPipeline, rayGenPrograms, missPrograms, hitGroups);
+    _device, _allocator, _raytracingProperties, _raytracingPipeline, rayGenGroups, missGroups, hitGroups);
   _deletionQueue.push([=]() { this->destroyBuffer(_shaderBindingTable->_handle); });
 }
 
@@ -1423,7 +1428,7 @@ void VkEngine::initDefaultData()
   _testMeshes.emplace_back(vkloader::loadGltfMeshes(this, "../assets/scaled_teapot.glb").value().at(0));
 
   // Alternative Material setup for raytracing
-  _materials.emplace_back(Material::Lambertian(glm::vec4(0.7f, 0.7f, 0.7f, 1.0), -1, 0.5));
+  _materials.emplace_back(Material::Lambertian(glm::vec4(0.7f, 0.7f, 0.7f, 1.0), -1, 1));
   _materials.emplace_back(Material::Metallic(glm::vec4(0.7f, 0.7f, 0.7f, 1.0), 0.5));
   _materials.emplace_back(Material::Dielectric(0.5));
   _materials.emplace_back(Material::Isotropic(glm::vec4(0.7f, 0.7f, 0.7f, 1.0)));

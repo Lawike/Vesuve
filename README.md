@@ -16,7 +16,7 @@ It is highly WIP and mostly a way for me to learn computer graphics and the API.
   - [x] Raygen shader
   - [x] Closest hit shader
   - [x] Miss Shader
-  - [ ] Any Hit Shader
+  - [x] Any Hit Shader
   - [x] Antialiasing
 ## Dependencies
 Most of the dependencies are retrieved using CMake FetchContent. They should be downloaded when configuring the CMake project.

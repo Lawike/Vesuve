@@ -16,14 +16,16 @@ namespace VulkanBackend
         std::string missPath,
         std::string shadowMissäth,
         std::string closestHitShader,
-        std::string anyHitShader,
-        std::string proceduralClosestHitShader,
-        std::string proceduralIntersectionShader);
+        std::string anyHitShader0,
+        std::string anyHitShader1
+        /** ,std::string proceduralClosestHitShader
+        std::string proceduralIntersectionShader*/);
       VkPipeline _handle;
       uint32_t _raygenGroupIndex;
       uint32_t _missGroupIndex;
       uint32_t _shadowMissGroupIndex;
       uint32_t _triangleHitGroupIndex;
+      uint32_t _anyHitGroupIndex;
       uint32_t _proceduralHitGroupIndex;
 
      private:
@@ -36,7 +38,8 @@ namespace VulkanBackend
       VkShaderModule _missShader;
       VkShaderModule _shadowMissShader;
       VkShaderModule _closestHitShader;
-      VkShaderModule _anyHitShader;
+      VkShaderModule _anyHitShader0;
+      VkShaderModule _anyHitShader1;
       VkShaderModule _proceduralClosestHitShader;
       VkShaderModule _proceduralIntersectionShader;
     };

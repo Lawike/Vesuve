@@ -1,4 +1,3 @@
-#version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_buffer_reference : require
@@ -9,7 +8,11 @@
 #include "random.glsl"
 #include "raycommon.glsl"
 
+#ifdef PAYLOAD_0
 layout(location = 0) rayPayloadInEXT hitPayload prd;
+#elif defined(PAYLOAD_1)
+layout(location = 1) rayPayloadInEXT shadowPayload prd;
+#endif
 
 layout(buffer_reference, scalar) readonly buffer VertexBuffer{ 
 	Vertex vertices[];
