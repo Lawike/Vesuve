@@ -16,6 +16,11 @@ namespace VulkanBackend
       bool mipmapped);
     ~Image() = default;
 
+    AllocatedImage getHandle() const
+    {
+      return _handle;
+    }
+
     AllocatedImage _handle{};
   };
 }  // namespace VulkanBackend

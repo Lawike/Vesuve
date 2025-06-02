@@ -638,6 +638,7 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
 
   _gpuSceneDataDescriptorSet =
     std::make_unique<DescriptorSet>(_device, _gpuSceneDataDescriptorLayout, _globalDescriptorAllocator);
+  DebugUtils::SetObjectName(_gpuSceneDataDescriptorSet->getHandle(), "GPU Scene data descriptor set", _device->getHandle());
 
   //allocate a new uniform buffer for the scene data
   AllocatedBuffer gpuSceneDataBuffer =
@@ -909,6 +910,7 @@ void VkEngine::initVulkan()
 void VkEngine::initSwapchain()
 {
   _swapchain = std::make_unique<Swapchain>(_chosenGPU, _device, _surface, _windowExtent.width, _windowExtent.height);
+  DebugUtils::SetObjectName(_swapchain->getHandle(), "Main Swapchain", _device->getHandle());
   this->createDrawImage();
   this->createDepthImage();
 }
@@ -927,9 +929,15 @@ void VkEngine::initFrameData()
 void VkEngine::initImmediateCommands()
 {
   _immCommandPool = std::make_unique<CommandPool>(_device);
+  DebugUtils::SetObjectName(_immCommandPool->getHandle(), "Immediate Command Pool", _device->getHandle());
+
   _immCommandBuffer = std::make_unique<CommandBuffer>(_device, _immCommandPool);
+  DebugUtils::SetObjectName(_immCommandBuffer->getHandle(), "Immediate Command Buffer", _device->getHandle());
+
   _deletionQueue.push([=]() { vkDestroyCommandPool(_device->getHandle(), _immCommandPool->getHandle(), nullptr); });
   _immFence = std::make_unique<Fence>(_device);
+  DebugUtils::SetObjectName(_immFence->getHandle(), "Immediate Command Fence", _device->getHandle());
+
   _deletionQueue.push([=]() { vkDestroyFence(_device->getHandle(), _immFence->_handle, nullptr); });
 }
 
@@ -948,11 +956,13 @@ void VkEngine::initDescriptors()
   //make the descriptor set layout for our compute draw
   std::vector<DescriptorBinding> drawImageBindings = {{0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT}};
   _drawImageDescriptorLayout = std::make_unique<DescriptorSetLayout>(_device, drawImageBindings);
-
+  DebugUtils::SetObjectName(_drawImageDescriptorLayout->getHandle(), "Draw image descriptor layout", _device->getHandle());
   //make the descriptor set layout for our default texture image
   std::vector<DescriptorBinding> singleImageBindings = {
     {0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT}};
   _singleImageDescriptorLayout = std::make_unique<DescriptorSetLayout>(_device, singleImageBindings);
+  DebugUtils::SetObjectName(
+    _singleImageDescriptorLayout->getHandle(), "Single image descriptor layout", _device->getHandle());
 
   std::vector<DescriptorBinding> sceneDataBindings = {
     // Camera matrices
@@ -962,9 +972,12 @@ void VkEngine::initDescriptors()
      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
        VK_SHADER_STAGE_FRAGMENT_BIT}};
   _gpuSceneDataDescriptorLayout = std::make_unique<DescriptorSetLayout>(_device, sceneDataBindings);
+  DebugUtils::SetObjectName(
+    _gpuSceneDataDescriptorLayout->getHandle(), "GPU Scene data descriptor layout", _device->getHandle());
 
   //allocate a descriptor set for our draw image
   _drawImageDescriptors = std::make_unique<DescriptorSet>(_device, _drawImageDescriptorLayout, _globalDescriptorAllocator);
+  DebugUtils::SetObjectName(_drawImageDescriptors->getHandle(), "Draw image descriptor", _device->getHandle());
   _drawImageDescriptors->writeImage(_device, _drawImage);
   _drawImageDescriptors->updateSet(_device);
   //make sure both the descriptor allocator and the new layout get cleaned up properly
@@ -998,8 +1011,12 @@ void VkEngine::initRaytracingDescriptors()
   };
   _raytracingDescriptorAllocator.init(_device->getHandle(), 1, sizes);
   _raytracingDescriptorSetLayout = std::make_unique<DescriptorSetLayout>(_device, bindings);
+  DebugUtils::SetObjectName(
+    _raytracingDescriptorSetLayout->getHandle(), "Raytracing descriptor set layout", _device->getHandle());
+
   _raytracingDescriptorSet =
     std::make_unique<DescriptorSet>(_device, _raytracingDescriptorSetLayout, _raytracingDescriptorAllocator);
+  DebugUtils::SetObjectName(_raytracingDescriptorSet->getHandle(), "Raytracing descriptor set", _device->getHandle());
 
   //make sure both the descriptor allocator and the new layout get cleaned up properly
   _deletionQueue.push(
@@ -1045,14 +1062,18 @@ void VkEngine::initBackgroundPipelines()
   std::vector<VkDescriptorSetLayout> descriptors = {_drawImageDescriptorLayout->_handle};
 
   _gradientPipelineLayout = std::make_unique<PipelineLayout>(_device, descriptors, pushConstants);
+  DebugUtils::SetObjectName(_gradientPipelineLayout->getHandle(), "Gradient pipeline layout", _device->getHandle());
 
   _gradientPipeline =
     std::make_unique<ComputePipeline>(_device, _gradientPipelineLayout, "../shaders/gradient_color.comp.spv", "gradient");
+  DebugUtils::SetObjectName(_gradientPipeline->getHandle(), "Gradient pipeline", _device->getHandle());
+
   _gradientPipeline->_effect.data.data1 = glm::vec4(1, 0, 0, 1);
   _gradientPipeline->_effect.data.data2 = glm::vec4(0, 0, 1, 1);
 
   _skyPipeline = std::make_unique<ComputePipeline>(_device, _gradientPipelineLayout, "../shaders/sky.comp.spv", "sky");
   _skyPipeline->_effect.data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
+  DebugUtils::SetObjectName(_gradientPipeline->getHandle(), "Sky pipeline", _device->getHandle());
 
   //add the 2 background effects into the array
   _backgroundEffects.push_back(&_gradientPipeline->_effect);
@@ -1079,6 +1100,8 @@ void VkEngine::initRaytracingPipeline()
   VkExtent3D imageExtent{_windowExtent.width, _windowExtent.height, 1};
 
   _accumulationImage = std::make_unique<Image>(_device, imageExtent, imageFormat, drawImageUsages, _allocator, false);
+  DebugUtils::SetObjectName(_accumulationImage->getHandle().image, "Accumulation image (raytracing)", _device->getHandle());
+
   std::vector<VkDescriptorSetLayout> descriptors = {
     _raytracingDescriptorSetLayout->_handle, _gpuSceneDataDescriptorLayout->_handle};
 
@@ -1089,6 +1112,7 @@ void VkEngine::initRaytracingPipeline()
   pc.size = sizeof(RaytracingPushConstant);
   pushConstants.emplace_back(pc);
   _raytracingPipelineLayout = std::make_unique<PipelineLayout>(_device, descriptors, pushConstants);
+  DebugUtils::SetObjectName(_raytracingPipelineLayout->getHandle(), "Raytracing pipeline layout", _device->getHandle());
 
   // Load shaders
   std::string raygenShader = "../shaders/raygen.rgen.spv";
@@ -1113,6 +1137,7 @@ void VkEngine::initRaytracingPipeline()
     /**,
     proceduralClosestHitShader,
     proceduralIntersectionShader*/);
+  DebugUtils::SetObjectName(_raytracingPipeline->getHandle(), "Raytracing pipeline", _device->getHandle());
 
   _deletionQueue.push(
     [=]()
@@ -1136,6 +1161,8 @@ void VkEngine::initShaderBindingTable()
     /** {_raytracingPipeline->_proceduralHitGroupIndex, {}}*/};
   _shaderBindingTable = std::make_unique<ShaderBindingTable>(
     _device, _allocator, _raytracingProperties, _raytracingPipeline, rayGenGroups, missGroups, hitGroups);
+  DebugUtils::SetObjectName(_shaderBindingTable->getHandle().buffer, "Shader binding table", _device->getHandle());
+
   _deletionQueue.push([=]() { this->destroyBuffer(_shaderBindingTable->_handle); });
 }
 
@@ -1232,6 +1259,7 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
       accelerationStructure._handle, ("BLAS #" + std::to_string(index)).c_str(), _device->getHandle());
     resultOffset += accelerationStructure._buildSizesInfo.accelerationStructureSize;
     scratchOffset += accelerationStructure._buildSizesInfo.buildScratchSize;
+    index++;
   }
 
   // Fill deletion queue with Acceleration structure
@@ -1270,6 +1298,8 @@ void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
   const auto contentSize = sizeof(_instances[0]) * _instances.size();
 
   _instancesBuffer = this->createBuffer(contentSize, allocateFlags, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+  DebugUtils::SetObjectName(_instancesBuffer.buffer, "BLAS Instance buffer", _device->getHandle());
+
   // Create and copy instances buffer (do it in a separate one-time synchronous command buffer).
   this->copyBuffer(cmd, _instancesBuffer, _instances);
 
@@ -1303,14 +1333,18 @@ void VkEngine::createTopLevelStructures(VkCommandBuffer cmd)
     total.accelerationStructureSize,
     VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR,
     VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+  DebugUtils::SetObjectName(_topBuffer.buffer, "TLAS buffer", _device->getHandle());
+
   _topScratchBuffer = this->createBuffer(
     total.buildScratchSize,
     VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
     VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+  DebugUtils::SetObjectName(_topBuffer.buffer, "TLAS scratch buffer", _device->getHandle());
 
   // Generate the structures.
   _topAS[0].Generate(_device, cmd, _topScratchBuffer, 0, _topBuffer, 0);
+  DebugUtils::SetObjectName(_topAS[0]._handle, "TLAS", _device->getHandle());
 
   // Make sure to have the TLAS ready before using it
   VkMemoryBarrier readyBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
@@ -1350,12 +1384,15 @@ void VkEngine::initDefaultData()
   uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
 
   createImage(_whiteImage, (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  DebugUtils::SetObjectName(_whiteImage->getHandle().image, "White image", _device->getHandle());
 
   uint32_t grey = glm::packUnorm4x8(glm::vec4(0.66f, 0.66f, 0.66f, 1));
   createImage(_greyImage, (void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  DebugUtils::SetObjectName(_greyImage->getHandle().image, "Grey image", _device->getHandle());
 
   uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
   createImage(_blackImage, (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  DebugUtils::SetObjectName(_blackImage->getHandle().image, "Black image", _device->getHandle());
 
   //checkerboard image
   uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
@@ -1369,17 +1406,19 @@ void VkEngine::initDefaultData()
   }
   createImage(
     _errorCheckerboardImage, pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  DebugUtils::SetObjectName(_errorCheckerboardImage->getHandle().image, "Error checkboard image", _device->getHandle());
 
   VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 
   sampl.magFilter = VK_FILTER_NEAREST;
   sampl.minFilter = VK_FILTER_NEAREST;
-
   vkCreateSampler(_device->getHandle(), &sampl, nullptr, &_defaultSamplerNearest);
+  DebugUtils::SetObjectName(_defaultSamplerNearest, "Default sampler nearest", _device->getHandle());
 
   sampl.magFilter = VK_FILTER_LINEAR;
   sampl.minFilter = VK_FILTER_LINEAR;
   vkCreateSampler(_device->getHandle(), &sampl, nullptr, &_defaultSamplerLinear);
+  DebugUtils::SetObjectName(_defaultSamplerLinear, "Default sampler linear", _device->getHandle());
 
   _deletionQueue.push(
     [&]()
@@ -1403,6 +1442,7 @@ void VkEngine::initDefaultData()
   //set the uniform buffer for the material data
   AllocatedBuffer materialConstants = createBuffer(
     sizeof(GLTFMetallicRoughness::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+  DebugUtils::SetObjectName(materialConstants.buffer, "Material constant buffer (rasterizer)", _device->getHandle());
 
   //write the buffer
   GLTFMetallicRoughness::MaterialConstants* sceneUniformData =
@@ -1439,10 +1479,16 @@ void VkEngine::initDefaultData()
     sizeof(Material) * _materials.size(),
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
     VMA_MEMORY_USAGE_AUTO);
+  DebugUtils::SetObjectName(_materialBuffer.buffer, "Material buffer", _device->getHandle());
+
   std::unique_ptr<CommandPool> pool = std::make_unique<CommandPool>(_device);
+  DebugUtils::SetObjectName(pool->getHandle(), "Command pool (material buffer init)", _device->getHandle());
+
   std::unique_ptr<SingleTimeCommand> cmd =
     std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
   cmd->begin();
+  DebugUtils::SetObjectName(cmd->buffer, "Command buffer (material buffer init)", _device->getHandle());
+
   this->copyBuffer(cmd->buffer, _materialBuffer, _materials);
   cmd->end();
   vkDestroyCommandPool(_device->getHandle(), pool->getHandle(), nullptr);
@@ -1515,6 +1561,7 @@ void VkEngine::resizeSwapchain()
 
   _swapchain.reset();
   _swapchain = std::make_unique<Swapchain>(_chosenGPU, _device, _surface, _windowExtent.width, _windowExtent.height);
+  DebugUtils::SetObjectName(_swapchain->getHandle(), "Main Swapchain", _device->getHandle());
 
   _resize_requested = false;
 }
@@ -1625,6 +1672,7 @@ void VkEngine::createDepthImage()
   VkExtent3D imageExtent = {_windowExtent.width, _windowExtent.height, 1};
 
   _depthImage = std::make_unique<Image>(_device, imageExtent, imageFormat, depthImageUsages, _allocator, false);
+  DebugUtils::SetObjectName(_depthImage->_handle.image, "Depth image", _device->getHandle());
 
   _deletionQueue.push([=]() { vmaDestroyImage(_allocator, _depthImage->_handle.image, _depthImage->_handle.allocation); });
   _deletionQueue.push([=]() { vkDestroyImageView(_device->getHandle(), _depthImage->_handle.imageView, nullptr); });

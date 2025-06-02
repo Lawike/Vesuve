@@ -10,6 +10,11 @@ namespace VulkanBackend
    public:
     DescriptorSetLayout(std::unique_ptr<Device>& device, std::vector<DescriptorBinding>& descriptorBindings);
 
+    VkDescriptorSetLayout getHandle() const
+    {
+      return _handle;
+    }
+
     VkDescriptorSetLayout _handle;
   };
 }  // namespace VulkanBackend

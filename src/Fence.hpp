@@ -10,6 +10,11 @@ namespace VulkanBackend
    public:
     Fence(std::unique_ptr<Device>& Device);
 
+    VkFence getHandle() const
+    {
+      return _handle;
+    }
+
     VkFence _handle;
   };
 }  // namespace VulkanBackend

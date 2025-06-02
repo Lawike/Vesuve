@@ -20,6 +20,10 @@ namespace VulkanBackend
         std::string anyHitShader1
         /** ,std::string proceduralClosestHitShader
         std::string proceduralIntersectionShader*/);
+      VkPipeline getHandle() const
+      {
+        return _handle;
+      }
       VkPipeline _handle;
       uint32_t _raygenGroupIndex;
       uint32_t _missGroupIndex;

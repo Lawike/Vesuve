@@ -12,6 +12,10 @@ namespace VulkanBackend
       std::unique_ptr<PipelineLayout>& pipelineLayout,
       std::string shaderPath,
       std::string effectName);
+    VkPipeline getHandle() const
+    {
+      return _handle;
+    }
     VkPipeline _handle;
     ComputeEffect _effect;
     VkShaderModule _shader;

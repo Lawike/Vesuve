@@ -1,3 +1,4 @@
+#include "DebugUtils.hpp"
 #include "DescriptorSetLayout.hpp"
 #include "Materials.hpp"
 #include "VkInitializers.hpp"
@@ -36,6 +37,7 @@ void GLTFMetallicRoughness::buildPipelines(
     2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 1);
 
   _materialLayout = layoutBuilder.build(device);
+  DebugUtils::SetObjectName(_materialLayout, "Material descriptor layout (rasterizer)", device);
 
   VkDescriptorSetLayout layouts[] = {gpuSceneDataDescriptorLayout, _materialLayout};
 
@@ -47,6 +49,7 @@ void GLTFMetallicRoughness::buildPipelines(
 
   VkPipelineLayout newLayout;
   VK_CHECK(vkCreatePipelineLayout(device, &meshLLayoutInfo, nullptr, &newLayout));
+  DebugUtils::SetObjectName(newLayout, "Opaque pipeline layout", device);
 
   _opaquePipeline.layout = newLayout;
   _transparentPipeline.layout = newLayout;
@@ -71,6 +74,7 @@ void GLTFMetallicRoughness::buildPipelines(
 
   // finally build the pipeline
   _opaquePipeline.pipeline = pipelineBuilder.buildPipeline(device);
+  DebugUtils::SetObjectName(_opaquePipeline.pipeline, "Opaque pipeline", device);
 
   // create the transparent variant
   pipelineBuilder.enableBlendingAdditive();
@@ -78,6 +82,7 @@ void GLTFMetallicRoughness::buildPipelines(
   pipelineBuilder.enableDepthtest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
   _transparentPipeline.pipeline = pipelineBuilder.buildPipeline(device);
+  DebugUtils::SetObjectName(_opaquePipeline.pipeline, "Transparent pipeline", device);
 
   vkDestroyShaderModule(device, meshFragShader, nullptr);
   vkDestroyShaderModule(device, meshVertexShader, nullptr);
@@ -114,7 +119,7 @@ MaterialInstance GLTFMetallicRoughness::writeMaterial(
   }
 
   matData.materialSet = descriptorAllocator.allocate(device, _materialLayout);
-
+  DebugUtils::SetObjectName(_opaquePipeline.pipeline, "Material set layout (rasterizer)", device);
 
   writer.clear();
   writer.writeBuffer(

@@ -129,9 +129,6 @@ class VkEngine
   std::vector<ComputeEffect*> _backgroundEffects;
   int _currentBackgroundEffect{0};
 
-  VkPipelineLayout _meshPipelineLayout;
-  VkPipeline _meshPipeline;
-
   std::vector<std::shared_ptr<MeshAsset>> _testMeshes;
 
   bool _resize_requested = false;

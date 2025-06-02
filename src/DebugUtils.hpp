@@ -68,6 +68,22 @@ class DebugUtils
   {
     SetObjectName(object, name, device, VK_OBJECT_TYPE_SWAPCHAIN_KHR);
   }
+  static void SetObjectName(const VkCommandPool& object, const char* name, VkDevice device)
+  {
+    SetObjectName(object, name, device, VK_OBJECT_TYPE_COMMAND_POOL);
+  }
+  static void SetObjectName(const VkFence& object, const char* name, VkDevice device)
+  {
+    SetObjectName(object, name, device, VK_OBJECT_TYPE_FENCE);
+  }
+  static void SetObjectName(const VkPipelineLayout& object, const char* name, VkDevice device)
+  {
+    SetObjectName(object, name, device, VK_OBJECT_TYPE_PIPELINE_LAYOUT);
+  }
+  static void SetObjectName(const VkSampler& object, const char* name, VkDevice device)
+  {
+    SetObjectName(object, name, device, VK_OBJECT_TYPE_SAMPLER);
+  }
 
   static VkResult CreateDebugUtilsMessengerEXT(
     VkInstance instance,

@@ -26,6 +26,10 @@ namespace VulkanBackend
         const std::vector<Entry>& missPrograms,
         const std::vector<Entry>& hitGroups);
 
+      AllocatedBuffer getHandle() const
+      {
+        return _handle;
+      }
       AllocatedBuffer _handle;
       VkDeviceAddress _raygenShaderAddress;
       VkDeviceAddress _missShaderAddress;
