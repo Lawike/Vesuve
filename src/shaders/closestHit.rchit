@@ -33,14 +33,6 @@ layout(set = 1, binding = 0) uniform SceneData
 
 hitAttributeEXT vec2 attribs;
 
-struct Vertex {
-	vec3 position;
-	float uv_x;
-	vec3 normal;
-	float uv_y;
-	vec4 color;
-}; 
-
 layout(buffer_reference, scalar) readonly buffer VertexBuffer{ 
 	Vertex vertices[];
 };
@@ -49,11 +41,16 @@ layout(buffer_reference, scalar) readonly buffer IndexBuffer{
 	uint indices[];
 };
 
+layout(buffer_reference, scalar) readonly buffer MaterialBuffer {
+    Material materials[];
+};
+
 //push constants block
 layout( push_constant ) uniform constants
 {
 	VertexBuffer vertexBuffer;
 	IndexBuffer indexBuffer;
+	MaterialBuffer materialBuffer;
 } PushConstants;
 
 vec3 lcolor = sceneData.lightColor.xyz;
@@ -114,7 +111,7 @@ void main()
     float tMax   = lightDistance;
     vec3  origin = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
     vec3  rayDir = L;
-    uint  flags  = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+    uint  flags  = gl_RayFlagsSkipClosestHitShaderEXT;
     isShadowed   = true;
     traceRayEXT(topLevelAS,  // acceleration structure
                 flags,       // rayFlags

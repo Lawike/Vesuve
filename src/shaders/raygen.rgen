@@ -36,6 +36,8 @@ void main()
     {
         // Initialize the random number generator
         uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, ubo.frameIndex);
+        prd.seed = seed;
+
         float r1 = rnd(seed);
         float r2 = rnd(seed);
         // Subpixel jitter: send the ray through a different position inside the pixel
@@ -48,7 +50,7 @@ void main()
         vec4 origin    = ubo.invView * vec4(0, 0, 0, 1);
         vec4 target    = ubo.invProj * vec4(d.x, d.y, 1.0, 1.0);
         vec4 direction = ubo.invView * vec4(normalize(target.xyz), 0);
-        uint  rayFlags = gl_RayFlagsOpaqueEXT;
+        uint  rayFlags = gl_RayFlagsNoneEXT;
         float tMin     = 0.1;
         float tMax     = 1000.0;
         traceRayEXT(topLevelAS, // acceleration structure

@@ -457,11 +457,12 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
   RaytracingPushConstant rtPushConstant{};
   rtPushConstant.vertexBufferAddress = _testMeshes[_selectedMeshIndex]->meshBuffers.vertexBufferAddress;
   rtPushConstant.indexBufferAddress = _testMeshes[_selectedMeshIndex]->meshBuffers.indexBufferAddress;
+  rtPushConstant.materialBufferAdress = _testMeshes[_selectedMeshIndex]->meshBuffers.materialBufferAddress;
 
   vkCmdPushConstants(
     cmd,
     _raytracingPipelineLayout->_handle,
-    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
     0,
     sizeof(RaytracingPushConstant),
     &rtPushConstant);
@@ -691,11 +692,12 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
   }
   else
   {
-    if (_frameNumber < maxNbOfFramesRT)
+    /* if (_frameNumber < maxNbOfFramesRT)
     {
-      this->drawRaytracing(cmd);
-      _lastSelectedNodeName = _selectedNodeName;
-    }
+    */
+    this->drawRaytracing(cmd);
+    _lastSelectedNodeName = _selectedNodeName;
+    //}
     _isPreviousFrameRT = true;
   }
 }
@@ -1083,7 +1085,7 @@ void VkEngine::initRaytracingPipeline()
   std::vector<VkPushConstantRange> pushConstants;
   VkPushConstantRange pc;
   pc.offset = 0;
-  pc.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  pc.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
   pc.size = sizeof(RaytracingPushConstant);
   pushConstants.emplace_back(pc);
   _raytracingPipelineLayout = std::make_unique<PipelineLayout>(_device, descriptors, pushConstants);
@@ -1093,6 +1095,7 @@ void VkEngine::initRaytracingPipeline()
   std::string missShader = "../shaders/miss.rmiss.spv";
   std::string shadowMissShader = "../shaders/shadow.rmiss.spv";
   std::string closestHitShader = "../shaders/closestHit.rchit.spv";
+  std::string anyHitShader = "../shaders/anyHit.rahit.spv";
   std::string proceduralClosestHitShader = "../shaders/proceduralClosestHit.rchit.spv";
   std::string proceduralIntersectionShader = "../shaders/proceduralIntersection.rint.spv";
 
@@ -1103,6 +1106,7 @@ void VkEngine::initRaytracingPipeline()
     missShader,
     shadowMissShader,
     closestHitShader,
+    anyHitShader,
     proceduralClosestHitShader,
     proceduralIntersectionShader);
 
@@ -1182,7 +1186,7 @@ void VkEngine::createBottomLevelStructures(VkCommandBuffer cmd)
     VkAccelerationStructureGeometryKHR geometry = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
     geometry.geometry.triangles = triangles;
     geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    geometry.flags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
 
     geometries.push_back(geometry);
 
@@ -1400,6 +1404,7 @@ void VkEngine::initDefaultData()
     (GLTFMetallicRoughness::MaterialConstants*)materialConstants.allocation->GetMappedData();
   sceneUniformData->colorFactors = glm::vec4{1, 1, 1, 1};
   sceneUniformData->metalRoughFactors = glm::vec4{1, 0.5, 0, 0};
+  sceneUniformData->transparency = 0;
 
   _mainSurfaceProperties.ambientCoefficient = 0.1;
   _mainSurfaceProperties.screenGamma = 2.2;
@@ -1414,16 +1419,39 @@ void VkEngine::initDefaultData()
   _defaultData = _metalRoughMaterial.writeMaterial(
     _device->getHandle(), MaterialPass::MainColor, materialResources, _globalDescriptorAllocator);
 
-  //MeshAsset triangleMesh = createTestTriangleMesh();
-  //MeshAsset quadMesh = createTestQuadMesh();
-
-  //_testMeshes.emplace_back(std::make_shared<MeshAsset>(std::move(triangleMesh)));
-  //_testMeshes.emplace_back(std::make_shared<MeshAsset>(std::move(quadMesh)));
   _testMeshes.emplace_back(vkloader::loadGltfMeshes(this, "../assets/cube.glb").value().at(0));
   _testMeshes.emplace_back(vkloader::loadGltfMeshes(this, "../assets/scaled_teapot.glb").value().at(0));
 
+  // Alternative Material setup for raytracing
+  _materials.emplace_back(Material::Lambertian(glm::vec4(0.7f, 0.7f, 0.7f, 1.0), -1, 0.5));
+  _materials.emplace_back(Material::Metallic(glm::vec4(0.7f, 0.7f, 0.7f, 1.0), 0.5));
+  _materials.emplace_back(Material::Dielectric(0.5));
+  _materials.emplace_back(Material::Isotropic(glm::vec4(0.7f, 0.7f, 0.7f, 1.0)));
+  _materials.emplace_back(Material::DiffuseLight(glm::vec4(0.7f, 0.7f, 0.7f, 1.0)));
+
+  //set the buffer for the material data
+  _materialBuffer = createBuffer(
+    sizeof(Material) * _materials.size(),
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    VMA_MEMORY_USAGE_AUTO);
+  std::unique_ptr<CommandPool> pool = std::make_unique<CommandPool>(_device);
+  std::unique_ptr<SingleTimeCommand> cmd =
+    std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
+  cmd->begin();
+  this->copyBuffer(cmd->buffer, _materialBuffer, _materials);
+  cmd->end();
+  vkDestroyCommandPool(_device->getHandle(), pool->getHandle(), nullptr);
+
+  _deletionQueue.push([=, this]() { destroyBuffer(_materialBuffer); });
+
   for (auto& m : _testMeshes)
   {
+    VkBufferDeviceAddressInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+    info.pNext = nullptr;
+    info.buffer = _materialBuffer.buffer;
+    m->meshBuffers.materialBufferAddress = vkGetBufferDeviceAddress(_device->getHandle(), &info);
+
     std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();
     newNode->mesh = m;
 

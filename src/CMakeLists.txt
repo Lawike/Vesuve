@@ -96,6 +96,7 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "*.rmiss"
     "*.rchit"
     "*.rint"
+    "*.rahit"
 )
 
 foreach(GLSL ${GLSL_SOURCE_FILES})

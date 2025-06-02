@@ -30,6 +30,7 @@ namespace VulkanBackend
       VkDeviceAddress _raygenShaderAddress;
       VkDeviceAddress _missShaderAddress;
       VkDeviceAddress _closesHitShaderAddress;
+      VkDeviceAddress _anyHitShaderAddress;
       VkDeviceAddress _proceduralClosestHitShaderAddress;
       VkDeviceAddress _proceduralIntersectionShaderAddress;
 

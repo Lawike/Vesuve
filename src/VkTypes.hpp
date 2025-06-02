@@ -137,6 +137,7 @@ struct GPUMeshBuffers
   AllocatedBuffer vertexBuffer;
   VkDeviceAddress vertexBufferAddress;
   VkDeviceAddress indexBufferAddress;
+  VkDeviceAddress materialBufferAddress;
   uint32_t vertexCount;
   uint32_t indexCount;
 };
@@ -152,6 +153,7 @@ struct RaytracingPushConstant
 {
   VkDeviceAddress vertexBufferAddress;
   VkDeviceAddress indexBufferAddress;
+  VkDeviceAddress materialBufferAdress;
 };
 
 struct DrawContext;

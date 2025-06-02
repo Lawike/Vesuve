@@ -172,6 +172,11 @@ class VkEngine
   // Surface properties for tests
   SurfaceProperties _mainSurfaceProperties;
 
+  // Materials
+  std::vector<Material> _materials;
+  AllocatedBuffer _materialBuffer;
+  AllocatedBuffer _materialIndices;
+
   // Raytracing
   std::unique_ptr<PipelineLayout> _raytracingPipelineLayout;
   std::unique_ptr<RaytracingPipeline> _raytracingPipeline;

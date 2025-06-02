@@ -16,6 +16,7 @@ namespace VulkanBackend
         std::string missPath,
         std::string shadowMissäth,
         std::string closestHitShader,
+        std::string anyHitShader,
         std::string proceduralClosestHitShader,
         std::string proceduralIntersectionShader);
       VkPipeline _handle;
@@ -35,6 +36,7 @@ namespace VulkanBackend
       VkShaderModule _missShader;
       VkShaderModule _shadowMissShader;
       VkShaderModule _closestHitShader;
+      VkShaderModule _anyHitShader;
       VkShaderModule _proceduralClosestHitShader;
       VkShaderModule _proceduralIntersectionShader;
     };
