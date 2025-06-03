@@ -195,7 +195,7 @@ void VkEngine::draw()
 {
   //wait until the gpu has finished rendering the last frame. Timeout of 1 second
   VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &this->getCurrentFrame()->_renderFence->_handle, true, 1000000000));
-  if (_isRaytracingEnabled != _isPreviousFrameRT)
+  if (_isRaytracingEnabled != _isPreviousFrameRT || _lastSelectedNodeName != _selectedNodeName)
   {
     this->resetFrame();
   }
