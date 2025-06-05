@@ -126,19 +126,19 @@ void UserInterface::displaySceneSelector(VkEngine* engine)
 {
   // Extract keys from unordered_map into a vector of strings
   std::vector<std::string> keys;
-  for (const auto& pair : engine->_loadedNodes)
+  for (const auto& pair : engine->_loadedScenes)
   {
     keys.push_back(pair.first.c_str());
   }
   // Display the combo box
-  if (ImGui::BeginCombo("Loaded nodes", engine->_selectedNodeName.c_str()))
+  if (ImGui::BeginCombo("Loaded nodes", engine->_selectedSceneName.c_str()))
   {
     for (size_t i = 0; i < keys.size(); i++)
     {
-      bool isSelected = keys[i] == engine->_selectedNodeName;
+      bool isSelected = keys[i] == engine->_selectedSceneName;
       if (ImGui::Selectable(keys[i].c_str(), isSelected))
       {
-        engine->_selectedNodeName = keys[i];
+        engine->_selectedSceneName = keys[i];
       }
     }
     ImGui::EndCombo();

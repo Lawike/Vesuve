@@ -18,5 +18,6 @@ namespace VulkanBackend
     vkb::PhysicalDevice _vkbHandle;
     VkPhysicalDeviceVulkan13Features _features13{};
     VkPhysicalDeviceVulkan12Features _features12{};
+    VkPhysicalDeviceFeatures _features{};
   };
 }  // namespace VulkanBackend

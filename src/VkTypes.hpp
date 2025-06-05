@@ -149,7 +149,7 @@ struct GPUDrawPushConstants
   VkDeviceAddress vertexBuffer;
 };
 
-struct RaytracingPushConstant
+struct GPUInstanceBuffers
 {
   VkDeviceAddress vertexBufferAddress;
   VkDeviceAddress indexBufferAddress;

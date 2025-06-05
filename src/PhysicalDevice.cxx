@@ -15,6 +15,9 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
   _features12.bufferDeviceAddress = true;
   _features12.descriptorIndexing = true;
 
+  //vulkan 1.0 features
+  _features.shaderInt64 = true;
+
   VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {};
   accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
   accelerationStructureFeatures.pNext = nullptr;
@@ -42,6 +45,7 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
   _vkbHandle = selector.set_minimum_version(1, 3)
                  .set_required_features_13(_features13)
                  .set_required_features_12(_features12)
+                 .set_required_features(_features)
                  .add_required_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
                  .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
                  .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)

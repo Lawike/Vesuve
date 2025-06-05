@@ -308,7 +308,6 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
     }
 
     nodes.push_back(newNode);
-    file.nodes[node.name.c_str()];
 
     std::visit(
       fastgltf::visitor{
@@ -326,28 +325,30 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
           newNode->localTransform = tm * rm * sm;
         }},
       node.transform);
+
+    file.nodes[node.name.c_str()] = newNode;
   }
 
   // run loop again to setup transform hierarchy
   for (int i = 0; i < gltf.nodes.size(); i++)
   {
     fastgltf::Node& node = gltf.nodes[i];
-    std::shared_ptr<Node>& sceneNode = nodes[i];
+    std::shared_ptr<Node>& sceneNode = file.nodes[node.name.c_str()];
 
     for (auto& c : node.children)
     {
-      sceneNode->children.push_back(nodes[c]);
       nodes[c]->parent = sceneNode;
+      sceneNode->children.push_back(nodes[c]);
     }
   }
 
   // find the top nodes, with no parents
-  for (auto& node : nodes)
+  for (auto& node : file.nodes)
   {
-    if (node->parent.lock() == nullptr)
+    if (node.second->parent.lock() == nullptr)
     {
-      file.topNodes.push_back(node);
-      node->refreshTransform(glm::mat4{1.f});
+      file.topNodes.push_back(node.second);
+      node.second->refreshTransform(glm::mat4{1.f});
     }
   }
   return scene;

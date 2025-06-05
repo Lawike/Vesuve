@@ -31,27 +31,21 @@ layout(set = 1, binding = 0) uniform SceneData
     uint frameIndex;
 } sceneData;
 
+layout(set = 0, binding = 2, scalar) buffer GPUInstanceBuffers_ { GPUInstanceBuffers buffersAdresses[]; } instanceBuffers;
+
 hitAttributeEXT vec2 attribs;
 
-layout(buffer_reference, scalar) readonly buffer VertexBuffer{ 
-	Vertex vertices[];
+layout(buffer_reference, scalar) readonly buffer Vertices{ 
+	Vertex v[];
 };
 
-layout(buffer_reference, scalar) readonly buffer IndexBuffer{ 
-	uint indices[];
+layout(buffer_reference, scalar) readonly buffer Indices{ 
+	uint i[];
 };
 
-layout(buffer_reference, scalar) readonly buffer MaterialBuffer {
-    Material materials[];
+layout(buffer_reference, scalar) readonly buffer Materials {
+    Material m[];
 };
-
-//push constants block
-layout( push_constant ) uniform constants
-{
-	VertexBuffer vertexBuffer;
-	IndexBuffer indexBuffer;
-	MaterialBuffer materialBuffer;
-} PushConstants;
 
 vec3 lcolor = sceneData.lightColor.xyz;
 float lpow = sceneData.lightPower;
@@ -59,13 +53,18 @@ vec3 lpos = sceneData.lightPosition.xyz;
 
 void main()
 {
-  uint triIndex0 = PushConstants.indexBuffer.indices[gl_PrimitiveID*3 + 0];
-  uint triIndex1 = PushConstants.indexBuffer.indices[gl_PrimitiveID*3 + 1];
-  uint triIndex2 = PushConstants.indexBuffer.indices[gl_PrimitiveID*3 + 2];
+  GPUInstanceBuffers instance = instanceBuffers.buffersAdresses[gl_InstanceCustomIndexEXT];
+  Vertices vertices = Vertices(instance.vertexBufferAddress);
+  Indices indices = Indices(instance.indexBufferAddress);
+  Materials materials = Materials(instance.materialBufferAddress);
 
-  Vertex vert0 = PushConstants.vertexBuffer.vertices[triIndex0];
-  Vertex vert1 = PushConstants.vertexBuffer.vertices[triIndex1];
-  Vertex vert2 = PushConstants.vertexBuffer.vertices[triIndex2];
+  uint triIndex0 = indices.i[gl_PrimitiveID*3 + 0];
+  uint triIndex1 = indices.i[gl_PrimitiveID*3 + 1];
+  uint triIndex2 = indices.i[gl_PrimitiveID*3 + 2];
+
+  Vertex vert0 = vertices.v[triIndex0];
+  Vertex vert1 = vertices.v[triIndex1];
+  Vertex vert2 = vertices.v[triIndex2];
 
   vec3 v0 = vert0.position;
   vec3 v1 = vert1.position;
@@ -145,8 +144,7 @@ void main()
       specular = specular * S;
     }
   }
-  //
-  // Normal debug
+
   const vec3 A =  sceneData.ambientCoefficient * sceneData.ambientColor.xyz;
   prd.hitValue = lightIntensity * attenuation * (D + specular + A);
 }

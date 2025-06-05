@@ -95,10 +95,13 @@ VkAccelerationStructureInstanceKHR VulkanBackend::Raytracing::TopLevelAccelerati
     VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;  // Disable culling - more fine control could be provided by the application
   instance.accelerationStructureReference = address;
 
-  // The instance.transform value only contains 12 values, corresponding to a 4x3 matrix,
-  // hence saving the last row that is anyway always (0,0,0,1).
-  // Since the matrix is row-major, we simply copy the first 12 values of the original 4x4 matrix
-  std::memcpy(&instance.transform, &transform, sizeof(instance.transform));
+  // VkTransformMatrixKHR uses a row-major memory layout, while glm::mat4
+  // uses a column-major memory layout. We transpose the matrix so we can
+  // memcpy the matrix's data directly.
+  glm::mat4 temp = glm::transpose(transform);
+  VkTransformMatrixKHR rowMajorMatrix;
+  memcpy(&rowMajorMatrix, &temp, sizeof(VkTransformMatrixKHR));
+  instance.transform = rowMajorMatrix;
 
   return instance;
 }

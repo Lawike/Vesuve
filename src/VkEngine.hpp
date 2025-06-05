@@ -83,7 +83,7 @@ class VkEngine
   bool _isInitialized{false};
   int _frameNumber{0};
   bool _stopRendering{false};
-  bool _isRaytracingEnabled{true};
+  bool _isRaytracingEnabled{false};
   bool _isPreviousFrameRT{false};
   uint32_t maxNbOfFramesRT = 10;
   VkExtent2D _windowExtent{1700, 900};
@@ -131,6 +131,7 @@ class VkEngine
 
   std::vector<std::shared_ptr<MeshAsset>> _testMeshes;
 
+
   bool _resize_requested = false;
 
   GPUSceneData _sceneData;
@@ -153,11 +154,9 @@ class VkEngine
   GLTFMetallicRoughness _metalRoughMaterial;
 
   DrawContext _mainDrawContext;
-  std::unordered_map<std::string, std::shared_ptr<Node>> _loadedNodes;
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> _loadedScenes;
-  std::string _selectedNodeName = "Cube";
-  std::string _lastSelectedNodeName = "Cube";
-  uint32_t _selectedMeshIndex = 0;
+  std::string _lastSelectedSceneName = "";
+  uint32_t _selectedSceneIndex = 0;
   std::string _selectedSceneName = "";
 
   Camera _mainCamera;
@@ -183,14 +182,17 @@ class VkEngine
   DescriptorAllocatorGrowable _raytracingDescriptorAllocator;
   std::unique_ptr<DescriptorSetLayout> _raytracingDescriptorSetLayout;
   std::unique_ptr<DescriptorSet> _raytracingDescriptorSet;
-  std::vector<TopLevelAccelerationStructure> _topAS;
-  std::vector<BottomLevelAccelerationStructure> _bottomAS;
-  std::vector<VkAccelerationStructureInstanceKHR> _instances;
+  std::unique_ptr<CommandPool> _raytracingUpdateCommandPool;
+
+  std::unordered_map<std::string, std::shared_ptr<TopLevelAccelerationStructure>> _topAS;
+  std::unordered_map<std::string, std::shared_ptr<BottomLevelAccelerationStructure>> _bottomAS;
+  std::unordered_map<std::string, std::vector<VkAccelerationStructureInstanceKHR>> _sceneInstances;
   AllocatedBuffer _bottomBuffer;
   AllocatedBuffer _scratchBuffer;
   AllocatedBuffer _topBuffer;
   AllocatedBuffer _topScratchBuffer;
-  AllocatedBuffer _instancesBuffer;
+  std::vector<AllocatedBuffer> _instancesBuffers;
+  AllocatedBuffer _loadedSceneBuffersAddress;
 
   static VkEngine& Get();
 

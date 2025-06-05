@@ -81,9 +81,8 @@ void VulkanBackend::DescriptorSet::writeBuffer(
 //--------------------------------------------------------------------------------------------------
 void VulkanBackend::DescriptorSet::writeAccelerationStructure(
   std::unique_ptr<Device>& device,
-  Raytracing::TopLevelAccelerationStructure& tlas,
   uint32_t binding,
-  VkWriteDescriptorSetAccelerationStructureKHR descInfo)
+  VkWriteDescriptorSetAccelerationStructureKHR& descInfo)
 {
   VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstBinding = binding;

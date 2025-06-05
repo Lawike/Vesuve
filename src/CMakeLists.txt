@@ -71,7 +71,14 @@ add_executable(
     "ShaderBindingTable.hpp"
     "RaytracingProperties.cxx"
     "RaytracingProperties.hpp"
-   "AccelerationStructure.cxx" "AccelerationStructure.hpp" "TopLevelAccelerationStructure.hpp" "TopLevelAccelerationStructure.cxx" "BottomLevelAccelerationStructure.hpp" "BottomLevelAccelerationStructure.cxx"  "BottomLevelGeometry.hpp")
+    "AccelerationStructure.cxx"
+    "AccelerationStructure.hpp"
+    "TopLevelAccelerationStructure.hpp"
+    "TopLevelAccelerationStructure.cxx"
+    "BottomLevelAccelerationStructure.hpp"
+    "BottomLevelAccelerationStructure.cxx"
+    "BottomLevelGeometry.hpp"
+)
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
@@ -105,7 +112,7 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
   add_custom_command(
     OUTPUT ${SPIRV}
     COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/shaders/"
-    COMMAND ${GLSL_VALIDATOR} --target-env vulkan1.3 -V -g -o ${SPIRV} ${GLSL} 
+    COMMAND ${GLSL_VALIDATOR} --target-env vulkan1.3 -V -o ${SPIRV} ${GLSL} 
     DEPENDS ${GLSL})
   list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)

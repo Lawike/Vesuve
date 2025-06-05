@@ -27,9 +27,8 @@ namespace VulkanBackend
     writeBuffers(std::unique_ptr<Device>& device, std::vector<AllocatedBuffer>& buffer, uint32_t binding, size_t offset);
     void writeAccelerationStructure(
       std::unique_ptr<Device>& device,
-      Raytracing::TopLevelAccelerationStructure& tlas,
       uint32_t binding,
-      VkWriteDescriptorSetAccelerationStructureKHR descInfo);
+      VkWriteDescriptorSetAccelerationStructureKHR& descInfo);
     template<class TUniformData> void writeUniformBuffer(
       std::unique_ptr<Device>& device,
       AllocatedBuffer& buffer,
