@@ -47,6 +47,10 @@ layout(buffer_reference, scalar) readonly buffer Materials {
     Material m[];
 };
 
+layout(buffer_reference, scalar) readonly buffer MaterialIndices {
+    uint i[];
+};
+
 vec3 lcolor = sceneData.lightColor.xyz;
 float lpow = sceneData.lightPower;
 vec3 lpos = sceneData.lightPosition.xyz;
@@ -57,6 +61,10 @@ void main()
   Vertices vertices = Vertices(instance.vertexBufferAddress);
   Indices indices = Indices(instance.indexBufferAddress);
   Materials materials = Materials(instance.materialBufferAddress);
+  MaterialIndices materialIndices = MaterialIndices(instance.materialIndicesBufferAddress);
+
+  uint matIndex = materialIndices.i[gl_PrimitiveID];
+  Material mat = materials.m[matIndex];
 
   uint triIndex0 = indices.i[gl_PrimitiveID*3 + 0];
   uint triIndex1 = indices.i[gl_PrimitiveID*3 + 1];
@@ -146,5 +154,16 @@ void main()
   }
 
   const vec3 A =  sceneData.ambientCoefficient * sceneData.ambientColor.xyz;
-  prd.hitValue = lightIntensity * attenuation * (D + specular + A);
+  // Reflection
+  if(mat.metalRoughFactors.y <= 0.1)
+  {
+    vec3 origin   = worldPos;
+    vec3 rayDir   = reflect(gl_WorldRayDirectionEXT, worldNormal);
+    prd.attenuation *= mat.metalRoughFactors.x;
+    prd.done = 0;
+    prd.rayOrigin = origin;
+    prd.rayDir = rayDir;
+  }
+  prd.hitValue = vec3(attenuation * lightIntensity * (D + specular + A));
+
 }

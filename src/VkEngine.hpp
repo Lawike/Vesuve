@@ -216,7 +216,11 @@ class VkEngine
 
   void immediateSubmit(std::function<void(VkCommandBuffer)>&& function);
 
-  GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+  GPUMeshBuffers uploadMesh(
+    std::span<uint32_t> indices,
+    std::span<Vertex> vertices,
+    std::vector<uint32_t> materialIndices,
+    std::string meshName);
 
   void updateScene();
 

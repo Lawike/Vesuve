@@ -29,7 +29,6 @@ void main()
 {
   GPUInstanceBuffers instance = instanceBuffers.buffersAdresses[gl_InstanceCustomIndexEXT];
   Materials materials = Materials(instance.materialBufferAddress);
-
   Material mat = materials.m[0];
   if (mat.transparency == 0)
     ignoreIntersectionEXT;

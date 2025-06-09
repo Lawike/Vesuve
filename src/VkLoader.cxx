@@ -124,9 +124,17 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
   // create buffer to hold the material data
   file.materialDataBuffer = engine->createBuffer(
     sizeof(GLTFMetallicRoughness::MaterialConstants) * gltf.materials.size(),
-    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
     VMA_MEMORY_USAGE_CPU_TO_GPU);
   int data_index = 0;
+
+  VkBufferDeviceAddressInfo addressInfo = {};
+  addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+  addressInfo.pNext = nullptr;
+  addressInfo.buffer = file.materialDataBuffer.buffer;
+  VkDeviceAddress materialBufferAddress = vkGetBufferDeviceAddress(engine->_device->getHandle(), &addressInfo);
+  file.materialDataBufferAddress = materialBufferAddress;
+
   GLTFMetallicRoughness::MaterialConstants* sceneMaterialConstants =
     (GLTFMetallicRoughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
 
@@ -144,6 +152,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
 
     constants.metalRoughFactors.x = mat.pbrData.metallicFactor;
     constants.metalRoughFactors.y = mat.pbrData.roughnessFactor;
+    constants.transparency = 1;
     // write material parameters to buffer
     sceneMaterialConstants[data_index] = constants;
 
@@ -151,6 +160,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
     if (mat.alphaMode == fastgltf::AlphaMode::Blend)
     {
       passType = MaterialPass::Transparent;
+      constants.transparency = 0.5;
     }
 
     GLTFMetallicRoughness::MaterialResources materialResources;
@@ -203,13 +213,31 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
 
       size_t initial_vtx = vertices.size();
 
-      // load indexes
+      // load materials
+      uint32_t matIndex = 0;
+      if (p.materialIndex.has_value())
+      {
+        newSurface.material = materials[p.materialIndex.value()];
+        matIndex = p.materialIndex.value();
+      }
+      else
+      {
+        newSurface.material = materials[0];
+      }
+
+      // load indices
       {
         fastgltf::Accessor& indexaccessor = gltf.accessors[p.indicesAccessor.value()];
         indices.reserve(indices.size() + indexaccessor.count);
 
         fastgltf::iterateAccessor<std::uint32_t>(
           gltf, indexaccessor, [&](std::uint32_t idx) { indices.push_back(idx + initial_vtx); });
+
+        uint32_t triangleCount = (uint32_t)indices.size() / 3;
+        for (uint32_t t = 0; t < triangleCount; t++)
+        {
+          newmesh->materialIndices.push_back(matIndex);
+        }
       }
 
       // load vertex positions
@@ -266,15 +294,6 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
           [&](glm::vec4 v, size_t index) { vertices[initial_vtx + index].color = v; });
       }
 
-      if (p.materialIndex.has_value())
-      {
-        newSurface.material = materials[p.materialIndex.value()];
-      }
-      else
-      {
-        newSurface.material = materials[0];
-      }
-
       glm::vec3 minpos = vertices[initial_vtx].position;
       glm::vec3 maxpos = vertices[initial_vtx].position;
       for (int i = initial_vtx; i < vertices.size(); i++)
@@ -289,7 +308,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
       newmesh->surfaces.push_back(newSurface);
     }
 
-    newmesh->meshBuffers = engine->uploadMesh(indices, vertices);
+    newmesh->meshBuffers = engine->uploadMesh(indices, vertices, newmesh->materialIndices, newmesh->name);
   }
   // load all nodes and their meshes
   for (fastgltf::Node& node : gltf.nodes)
@@ -530,6 +549,7 @@ void LoadedGLTF::clearAll()
   {
     creator->destroyBuffer(v->meshBuffers.indexBuffer);
     creator->destroyBuffer(v->meshBuffers.vertexBuffer);
+    creator->destroyBuffer(v->meshBuffers.materialIndicesBuffer);
   }
 
   for (auto& [k, v] : images)
@@ -670,7 +690,7 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> vkloader::loadGltfMeshes(
         vtx.color = glm::vec4(vtx.normal, 1.f);
       }
     }
-    newmesh.meshBuffers = engine->uploadMesh(indices, vertices);
+    newmesh.meshBuffers = engine->uploadMesh(indices, vertices, newmesh.materialIndices, newmesh.name);
 
     meshes.emplace_back(std::make_shared<MeshAsset>(std::move(newmesh)));
   }

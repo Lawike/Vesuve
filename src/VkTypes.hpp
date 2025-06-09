@@ -135,9 +135,11 @@ struct GPUMeshBuffers
 {
   AllocatedBuffer indexBuffer;
   AllocatedBuffer vertexBuffer;
+  AllocatedBuffer materialIndicesBuffer;
   VkDeviceAddress vertexBufferAddress;
   VkDeviceAddress indexBufferAddress;
   VkDeviceAddress materialBufferAddress;
+  VkDeviceAddress materialIndicesBufferAddress;
   uint32_t vertexCount;
   uint32_t indexCount;
 };
@@ -154,6 +156,7 @@ struct GPUInstanceBuffers
   VkDeviceAddress vertexBufferAddress;
   VkDeviceAddress indexBufferAddress;
   VkDeviceAddress materialBufferAdress;
+  VkDeviceAddress materialIndexBufferAddress;
 };
 
 struct DrawContext;

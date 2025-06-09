@@ -16,7 +16,7 @@ class GLTFMetallicRoughness
     glm::vec4 metalRoughFactors;
     float transparency;
     //padding, we need it anyway for uniform buffers (256 bytes alignement)
-    glm::vec4 extra[13];
+    float extra[55];
   };
 
   static_assert(sizeof(MaterialConstants) == 256);

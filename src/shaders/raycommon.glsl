@@ -4,6 +4,11 @@ struct hitPayload
 {
   vec3 hitValue;
   uint seed;
+  int depth;
+  vec3 attenuation;
+  int  done;
+  vec3 rayOrigin;
+  vec3 rayDir;
 };
 
 struct Vertex {
@@ -15,13 +20,10 @@ struct Vertex {
 }; 
 
 struct Material {
-    vec4 Diffuse;
-    uint DiffuseTextureId;
-    float Fuzziness;
-    float RefractionIndex;
-	float transparency;
-	uint matIndex;
-	vec3 _padding;
+    vec4 colorFactors;
+    vec4 metalRoughFactors;
+    float transparency;
+	float extra[55];
 };
 
 struct shadowPayload
@@ -33,4 +35,5 @@ struct GPUInstanceBuffers {
     uint64_t vertexBufferAddress;
 	uint64_t indexBufferAddress;
 	uint64_t materialBufferAddress;
-	};
+	uint64_t materialIndicesBufferAddress;
+};

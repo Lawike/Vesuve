@@ -29,8 +29,8 @@ struct GeoSurface
 struct MeshAsset
 {
   std::string name;
-
   std::vector<GeoSurface> surfaces;
+  std::vector<uint32_t> materialIndices;
   GPUMeshBuffers meshBuffers;
 };
 
@@ -52,6 +52,7 @@ struct LoadedGLTF : public IRenderable
   DescriptorAllocatorGrowable descriptorPool;
 
   AllocatedBuffer materialDataBuffer;
+  VkDeviceAddress materialDataBufferAddress;
 
   VkEngine* creator;
 

@@ -700,40 +700,62 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
 }
 
 //--------------------------------------------------------------------------------------------------
-GPUMeshBuffers VkEngine::uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices)
+GPUMeshBuffers VkEngine::uploadMesh(
+  std::span<uint32_t> indices,
+  std::span<Vertex> vertices,
+  std::vector<uint32_t> materialIndices,
+  std::string meshName)
 {
   const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
   const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
+  const size_t materialIndicesBufferSize = materialIndices.size() * sizeof(uint32_t);
 
-  GPUMeshBuffers newSurface;
+  GPUMeshBuffers newMesh;
 
   //create vertex buffer
-  newSurface.vertexBuffer = this->createBuffer(
+  newMesh.vertexBuffer = this->createBuffer(
     vertexBufferSize,
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
     VMA_MEMORY_USAGE_AUTO);
-  newSurface.vertexCount = vertices.size();
+  newMesh.vertexCount = vertices.size();
+  DebugUtils::SetObjectName(newMesh.vertexBuffer.buffer, (meshName.append(" vertex buffer")).c_str(), _device->getHandle());
 
   //find the address of the vertex buffer
   VkBufferDeviceAddressInfo vertexAdressInfo{
-    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = newSurface.vertexBuffer.buffer};
-  newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(_device->getHandle(), &vertexAdressInfo);
+    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = newMesh.vertexBuffer.buffer};
+  newMesh.vertexBufferAddress = vkGetBufferDeviceAddress(_device->getHandle(), &vertexAdressInfo);
 
   //create index buffer
-  newSurface.indexBuffer = this->createBuffer(
+  newMesh.indexBuffer = this->createBuffer(
     indexBufferSize,
     VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
     VMA_MEMORY_USAGE_AUTO);
-  newSurface.indexCount = indices.size();
+  DebugUtils::SetObjectName(newMesh.indexBuffer.buffer, (meshName.append(" index buffer")).c_str(), _device->getHandle());
+  newMesh.indexCount = indices.size();
 
   //find the address of the index buffer
   VkBufferDeviceAddressInfo indexAdressInfo{
-    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = newSurface.indexBuffer.buffer};
-  newSurface.indexBufferAddress = vkGetBufferDeviceAddress(_device->getHandle(), &indexAdressInfo);
-  AllocatedBuffer staging =
-    this->createBuffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = newMesh.indexBuffer.buffer};
+  newMesh.indexBufferAddress = vkGetBufferDeviceAddress(_device->getHandle(), &indexAdressInfo);
+
+  //create material indices buffer
+  newMesh.materialIndicesBuffer = this->createBuffer(
+    indexBufferSize,
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    VMA_MEMORY_USAGE_AUTO);
+  DebugUtils::SetObjectName(
+    newMesh.materialIndicesBuffer.buffer, (meshName.append(" material indices buffer")).c_str(), _device->getHandle());
+
+  //find the address of the material indices buffer
+  VkBufferDeviceAddressInfo materialIndicesBufferAdressInfo{
+    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = newMesh.materialIndicesBuffer.buffer};
+  newMesh.materialIndicesBufferAddress = vkGetBufferDeviceAddress(_device->getHandle(), &materialIndicesBufferAdressInfo);
+  AllocatedBuffer staging = this->createBuffer(
+    vertexBufferSize + indexBufferSize + materialIndicesBufferSize,
+    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    VMA_MEMORY_USAGE_CPU_ONLY);
 
   void* data = staging.allocation->GetMappedData();
 
@@ -741,6 +763,8 @@ GPUMeshBuffers VkEngine::uploadMesh(std::span<uint32_t> indices, std::span<Verte
   memcpy(data, vertices.data(), vertexBufferSize);
   // copy index buffer
   memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
+  // copy material indices buffer
+  memcpy((char*)data + vertexBufferSize + indexBufferSize, materialIndices.data(), materialIndicesBufferSize);
 
   this->immediateSubmit(
     [&](VkCommandBuffer cmd)
@@ -750,19 +774,26 @@ GPUMeshBuffers VkEngine::uploadMesh(std::span<uint32_t> indices, std::span<Verte
       vertexCopy.srcOffset = 0;
       vertexCopy.size = vertexBufferSize;
 
-      vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
+      vkCmdCopyBuffer(cmd, staging.buffer, newMesh.vertexBuffer.buffer, 1, &vertexCopy);
 
       VkBufferCopy indexCopy{0};
       indexCopy.dstOffset = 0;
       indexCopy.srcOffset = vertexBufferSize;
       indexCopy.size = indexBufferSize;
 
-      vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
+      vkCmdCopyBuffer(cmd, staging.buffer, newMesh.indexBuffer.buffer, 1, &indexCopy);
+
+      VkBufferCopy materialIndicesCopy{0};
+      materialIndicesCopy.dstOffset = 0;
+      materialIndicesCopy.srcOffset = indexBufferSize + vertexBufferSize;
+      materialIndicesCopy.size = materialIndicesBufferSize;
+
+      vkCmdCopyBuffer(cmd, staging.buffer, newMesh.materialIndicesBuffer.buffer, 1, &materialIndicesCopy);
     });
 
   this->destroyBuffer(staging);
 
-  return newSurface;
+  return newMesh;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1046,7 +1077,8 @@ void VkEngine::updateRaytracingDescriptors()
     GPUInstanceBuffers buffers;
     buffers.vertexBufferAddress = mesh.second->meshBuffers.vertexBufferAddress;
     buffers.indexBufferAddress = mesh.second->meshBuffers.indexBufferAddress;
-    buffers.materialBufferAdress = mesh.second->meshBuffers.materialBufferAddress;
+    buffers.materialBufferAdress = _loadedScenes[_selectedSceneName]->materialDataBufferAddress;
+    buffers.materialIndexBufferAddress = mesh.second->meshBuffers.materialIndicesBufferAddress;
     instanceBuffers.push_back(buffers);
   }
   // Update the set
@@ -1537,34 +1569,6 @@ void VkEngine::initDefaultData()
     VMA_MEMORY_USAGE_AUTO);
 
   _deletionQueue.push([=, this]() { destroyBuffer(_loadedSceneBuffersAddress); });
-
-  // Alternative Material setup for raytracing
-  _materials.emplace_back(Material::Lambertian(glm::vec4(0.7f, 0.7f, 0.7f, 1.0), -1, 1));
-  _materials.emplace_back(Material::Metallic(glm::vec4(0.7f, 0.7f, 0.7f, 1.0), 0.5));
-  _materials.emplace_back(Material::Dielectric(0.5));
-  _materials.emplace_back(Material::Isotropic(glm::vec4(0.7f, 0.7f, 0.7f, 1.0)));
-  _materials.emplace_back(Material::DiffuseLight(glm::vec4(0.7f, 0.7f, 0.7f, 1.0)));
-
-  //set the buffer for the material data
-  _materialBuffer = createBuffer(
-    sizeof(Material) * _materials.size(),
-    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-    VMA_MEMORY_USAGE_AUTO);
-  DebugUtils::SetObjectName(_materialBuffer.buffer, "Material buffer", _device->getHandle());
-
-  std::unique_ptr<CommandPool> pool = std::make_unique<CommandPool>(_device);
-  DebugUtils::SetObjectName(pool->getHandle(), "Command pool (material buffer init)", _device->getHandle());
-
-  std::unique_ptr<SingleTimeCommand> cmd =
-    std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
-  cmd->begin();
-  DebugUtils::SetObjectName(cmd->buffer, "Command buffer (material buffer init)", _device->getHandle());
-
-  this->copyBuffer(cmd->buffer, _materialBuffer, _materials);
-  cmd->end();
-  vkDestroyCommandPool(_device->getHandle(), pool->getHandle(), nullptr);
-
-  _deletionQueue.push([=, this]() { destroyBuffer(_materialBuffer); });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1824,7 +1828,7 @@ MeshAsset VkEngine::createTestTriangleMesh()
   vertices = {v0, v1, v2};
   std::vector<uint32_t> indices = {0, 1, 2};
 
-  testTriangle.meshBuffers = uploadMesh(indices, vertices);
+  //testTriangle.meshBuffers = uploadMesh(indices, vertices, std::string("test cube"));
   testTriangle.name = "Triangle";
 
   GeoSurface newSurface;
@@ -1874,7 +1878,7 @@ MeshAsset VkEngine::createTestQuadMesh()
   vertices = {v0, v1, v2, v3};
   std::vector<uint32_t> indices = {0, 1, 2, 3, 2, 1};
 
-  testQuad.meshBuffers = uploadMesh(indices, vertices);
+  //testQuad.meshBuffers = uploadMesh(indices, vertices);
   testQuad.name = "Quad";
 
   GeoSurface newSurface;
