@@ -109,7 +109,7 @@ void main()
 
   // Blinn phong
   float NdotL = clamp(dot(worldNormal, L), 0.0, 1.0);
-  vec3 D = lpow * (lcolor.xyz * NdotL);
+  vec3 D = lpow * (lcolor.xyz * NdotL) * mat.colorFactors.xyz;
   vec3  specular    = vec3(0.,0.,0.);
   float attenuation = 1;
  if(dot(worldNormal, L) > 0)

@@ -80,11 +80,20 @@ class VkEngine
   VkEngine& operator=(const VkEngine&) = delete;
   VkEngine& operator=(VkEngine&&) = delete;
 
+  enum RenderingMode : uint8_t
+  {
+    Rasterizer,
+    Raytracing,
+    Pathtracing
+  };
+
   bool _isInitialized{false};
   int _frameNumber{0};
   bool _stopRendering{false};
   bool _isRaytracingEnabled{false};
-  bool _isPreviousFrameRT{false};
+  RenderingMode _renderMode{RenderingMode::Rasterizer};
+  RenderingMode _previousFrameRenderMode{RenderingMode::Rasterizer};
+
   uint32_t maxNbOfFramesRT = 10;
   VkExtent2D _windowExtent{1700, 900};
 
@@ -169,7 +178,6 @@ class VkEngine
   SurfaceProperties _mainSurfaceProperties;
 
   // Materials
-  std::vector<Material> _materials;
   AllocatedBuffer _materialBuffer;
   AllocatedBuffer _materialIndices;
 
@@ -178,7 +186,8 @@ class VkEngine
   std::unique_ptr<RaytracingPipeline> _raytracingPipeline;
   std::unique_ptr<Image> _accumulationImage;
   std::unique_ptr<RaytracingProperties> _raytracingProperties;
-  std::unique_ptr<ShaderBindingTable> _shaderBindingTable;
+  std::shared_ptr<ShaderBindingTable> _shaderBindingTable;
+  std::shared_ptr<ShaderBindingTable> _pathTraceShaderBindingTable;
   DescriptorAllocatorGrowable _raytracingDescriptorAllocator;
   std::unique_ptr<DescriptorSetLayout> _raytracingDescriptorSetLayout;
   std::unique_ptr<DescriptorSet> _raytracingDescriptorSet;

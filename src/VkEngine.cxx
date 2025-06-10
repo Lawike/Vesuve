@@ -118,7 +118,7 @@ void VkEngine::init()
   this->initImmediateCommands();
   this->initDescriptors();
   this->initPipelines();
-  UserInterface::init(this);
+  UI::UserInterface::init(this);
   this->initDefaultData();
   this->initRaytracingDescriptors();
   this->initRaytracingPipeline();
@@ -189,7 +189,7 @@ void VkEngine::draw()
 {
   //wait until the gpu has finished rendering the last frame. Timeout of 1 second
   VK_CHECK(vkWaitForFences(_device->getHandle(), 1, &this->getCurrentFrame()->_renderFence->_handle, true, 1000000000));
-  if (_isRaytracingEnabled != _isPreviousFrameRT || _lastSelectedSceneName != _selectedSceneName)
+  if (_renderMode != _previousFrameRenderMode || _lastSelectedSceneName != _selectedSceneName)
   {
     this->resetFrame();
   }
@@ -450,34 +450,47 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
     nullptr);
 
   // Bind ray tracing pipeline.
-  GPUInstanceBuffers rtPushConstant{};
-  rtPushConstant.vertexBufferAddress = 0;
-  rtPushConstant.indexBufferAddress = 0;
-  rtPushConstant.materialBufferAdress = 0;
+  RTPushconstants rtPushConstant{};
+  rtPushConstant.clearColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+  rtPushConstant.lightPosition = _sceneData.lightPosition;
+  rtPushConstant.lightIntensity = _sceneData.lightPower;
+  rtPushConstant.lightType = 0;
+  rtPushConstant.maxDepth = 100;
 
   vkCmdPushConstants(
     cmd,
     _raytracingPipelineLayout->_handle,
-    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR,
     0,
-    sizeof(GPUInstanceBuffers),
+    sizeof(RTPushconstants),
     &rtPushConstant);
+
+  std::shared_ptr<ShaderBindingTable> sbt;
+
+  if (_renderMode == RenderingMode::Raytracing)
+  {
+    sbt = _shaderBindingTable;
+  }
+  else if (_renderMode == RenderingMode::Pathtracing)
+  {
+    sbt = _pathTraceShaderBindingTable;
+  }
 
   // Describe the shader binding table.
   VkStridedDeviceAddressRegionKHR raygenShaderBindingTable = {};
-  raygenShaderBindingTable.deviceAddress = _shaderBindingTable->_raygenShaderAddress;
-  raygenShaderBindingTable.stride = _shaderBindingTable->_raygenEntrySize;
-  raygenShaderBindingTable.size = _shaderBindingTable->_raygenSize;
+  raygenShaderBindingTable.deviceAddress = sbt->_raygenShaderAddress;
+  raygenShaderBindingTable.stride = sbt->_raygenEntrySize;
+  raygenShaderBindingTable.size = sbt->_raygenSize;
 
   VkStridedDeviceAddressRegionKHR missShaderBindingTable = {};
-  missShaderBindingTable.deviceAddress = _shaderBindingTable->_missShaderAddress;
-  missShaderBindingTable.stride = _shaderBindingTable->_missEntrySize;
-  missShaderBindingTable.size = _shaderBindingTable->_missSize;
+  missShaderBindingTable.deviceAddress = sbt->_missShaderAddress;
+  missShaderBindingTable.stride = sbt->_missEntrySize;
+  missShaderBindingTable.size = sbt->_missSize;
 
   VkStridedDeviceAddressRegionKHR hitShaderBindingTable = {};
-  hitShaderBindingTable.deviceAddress = _shaderBindingTable->_closesHitShaderAddress;
-  hitShaderBindingTable.stride = _shaderBindingTable->_hitGroupEntrySize;
-  hitShaderBindingTable.size = _shaderBindingTable->_hitGroupSize;
+  hitShaderBindingTable.deviceAddress = sbt->_closesHitShaderAddress;
+  hitShaderBindingTable.stride = sbt->_hitGroupEntrySize;
+  hitShaderBindingTable.size = sbt->_hitGroupSize;
 
   VkStridedDeviceAddressRegionKHR callableShaderBindingTable = {};
 
@@ -652,7 +665,7 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
 
   VkRenderingInfo renderInfo = vkinit::renderingInfo(_windowExtent, &colorAttachment, &depthAttachment);
   // Draw either blinn phong or ray tracing.
-  if (!_isRaytracingEnabled)
+  if (_renderMode == RenderingMode::Rasterizer)
   {
     ComputeEffect* effect = _backgroundEffects[_currentBackgroundEffect];
 
@@ -685,18 +698,16 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
     _stats.meshDrawTime = elapsed.count() / 1000.f;
 
     vkCmdEndRendering(cmd);
-    _isPreviousFrameRT = false;
   }
   else
   {
-    /* if (_frameNumber < maxNbOfFramesRT)
+    if (_frameNumber < maxNbOfFramesRT || _renderMode == RenderingMode::Pathtracing)
     {
-    */
-    this->drawRaytracing(cmd);
-    _lastSelectedSceneName = _selectedSceneName;
-    //}
-    _isPreviousFrameRT = true;
+      this->drawRaytracing(cmd);
+      _lastSelectedSceneName = _selectedSceneName;
+    }
   }
+  _previousFrameRenderMode = _renderMode;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -879,7 +890,7 @@ void VkEngine::run()
       continue;
     }
 
-    UserInterface::display(this);
+    UI::UserInterface::display(this);
 
     this->updateScene();
 
@@ -1183,17 +1194,19 @@ void VkEngine::initRaytracingPipeline()
   std::vector<VkPushConstantRange> pushConstants;
   VkPushConstantRange pc;
   pc.offset = 0;
-  pc.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-  pc.size = sizeof(GPUInstanceBuffers);
+  pc.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+  pc.size = sizeof(RTPushconstants);
   pushConstants.emplace_back(pc);
   _raytracingPipelineLayout = std::make_unique<PipelineLayout>(_device, descriptors, pushConstants);
   DebugUtils::SetObjectName(_raytracingPipelineLayout->getHandle(), "Raytracing pipeline layout", _device->getHandle());
 
   // Load shaders
-  std::string raygenShader = "../shaders/raygen.rgen.spv";
+  std::string raygenShader = "../shaders/raytrace.rgen.spv";
+  std::string pathtraceRaygenShader = "../shaders/pathtrace.rgen.spv";
   std::string missShader = "../shaders/miss.rmiss.spv";
   std::string shadowMissShader = "../shaders/shadow.rmiss.spv";
-  std::string closestHitShader = "../shaders/closestHit.rchit.spv";
+  std::string closestHitShader = "../shaders/raytrace.rchit.spv";
+  std::string pathtraceClosestHitShader = "../shaders/pathtrace.rchit.spv";
   std::string anyHitShader0 = "../shaders/anyHit0.rahit.spv";
   std::string anyHitShader1 = "../shaders/anyHit1.rahit.spv";
 
@@ -1204,9 +1217,11 @@ void VkEngine::initRaytracingPipeline()
     _device,
     _raytracingPipelineLayout,
     raygenShader,
+    pathtraceRaygenShader,
     missShader,
     shadowMissShader,
     closestHitShader,
+    pathtraceClosestHitShader,
     anyHitShader0,
     anyHitShader1
     /**,
@@ -1228,17 +1243,40 @@ void VkEngine::initRaytracingPipeline()
 void VkEngine::initShaderBindingTable()
 {
   _raytracingProperties = std::make_unique<RaytracingProperties>(_chosenGPU);
+
   const std::vector<ShaderBindingTable::Entry> rayGenGroups = {{_raytracingPipeline->_raygenGroupIndex, {}}};
   const std::vector<ShaderBindingTable::Entry> missGroups = {
     {_raytracingPipeline->_missGroupIndex, {}}, {{_raytracingPipeline->_shadowMissGroupIndex}, {}}};
   const std::vector<ShaderBindingTable::Entry> hitGroups = {
     {_raytracingPipeline->_triangleHitGroupIndex, {}}, {_raytracingPipeline->_anyHitGroupIndex, {}},
     /** {_raytracingPipeline->_proceduralHitGroupIndex, {}}*/};
-  _shaderBindingTable = std::make_unique<ShaderBindingTable>(
+
+  // Raytrace shader binding table init
+  _shaderBindingTable = std::make_shared<ShaderBindingTable>(
     _device, _allocator, _raytracingProperties, _raytracingPipeline, rayGenGroups, missGroups, hitGroups);
   DebugUtils::SetObjectName(_shaderBindingTable->getHandle().buffer, "Shader binding table", _device->getHandle());
 
-  _deletionQueue.push([=]() { this->destroyBuffer(_shaderBindingTable->_handle); });
+  const std::vector<ShaderBindingTable::Entry> pathTraceRayGenGroups = {
+    {_raytracingPipeline->_pathTraceRaygenGroupIndex, {}}};
+  const std::vector<ShaderBindingTable::Entry> pathTracehitGroups = {
+    {_raytracingPipeline->_pathTraceHitGroupIndex, {}}, {_raytracingPipeline->_anyHitGroupIndex, {}}};
+
+  // Path Trace shader binding table init
+  _pathTraceShaderBindingTable = std::make_shared<ShaderBindingTable>(
+    _device,
+    _allocator,
+    _raytracingProperties,
+    _raytracingPipeline,
+    pathTraceRayGenGroups,
+    missGroups /* Can use same as raytrace */,
+    pathTracehitGroups);
+
+  _deletionQueue.push(
+    [=]()
+    {
+      this->destroyBuffer(_shaderBindingTable->_handle);
+      this->destroyBuffer(_pathTraceShaderBindingTable->_handle);
+    });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1561,10 +1599,12 @@ void VkEngine::initDefaultData()
 
   //_loadedScenes.emplace("teapot", vkloader::loadGltf(this, "../assets/scaled_teapot.glb").value());
   //_loadedScenes.emplace("cube", vkloader::loadGltf(this, "../assets/cube.glb").value());
-  _loadedScenes.emplace("reflective_scene", vkloader::loadGltf(this, "../assets/reflective_scene.glb").value());
+  //_loadedScenes.emplace("reflective_scene", vkloader::loadGltf(this, "../assets/reflective_scene.glb").value());
+  _loadedScenes.emplace("cornell_box", vkloader::loadGltf(this, "../assets/cornell_box.glb").value());
+
 
   _loadedSceneBuffersAddress = createBuffer(
-    sizeof(GPUInstanceBuffers) * _loadedScenes["reflective_scene"]->meshes.size(),
+    sizeof(GPUInstanceBuffers) * _loadedScenes["cornell_box"]->meshes.size(),
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
     VMA_MEMORY_USAGE_AUTO);
 

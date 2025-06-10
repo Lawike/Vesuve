@@ -24,7 +24,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
   scene->creator = engine;
   LoadedGLTF& file = *scene.get();
 
-  fastgltf::Parser parser{};
+  fastgltf::Parser parser{fastgltf::Extensions::KHR_materials_emissive_strength};
 
   constexpr auto gltfOptions = fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble |
                                fastgltf::Options::LoadGLBBuffers | fastgltf::Options::LoadExternalBuffers;
@@ -153,8 +153,11 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
     constants.metalRoughFactors.x = mat.pbrData.metallicFactor;
     constants.metalRoughFactors.y = mat.pbrData.roughnessFactor;
     constants.transparency = 1;
+    constants.emissiveFactors.x = mat.emissiveFactor[0];
+    constants.emissiveFactors.y = mat.emissiveFactor[1];
+    constants.emissiveFactors.z = mat.emissiveFactor[2];
+    constants.emissivePower = mat.emissiveStrength;
     // write material parameters to buffer
-    sceneMaterialConstants[data_index] = constants;
 
     MaterialPass passType = MaterialPass::MainColor;
     if (mat.alphaMode == fastgltf::AlphaMode::Blend)
@@ -162,6 +165,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
       passType = MaterialPass::Transparent;
       constants.transparency = 0.5;
     }
+    sceneMaterialConstants[data_index] = constants;
 
     GLTFMetallicRoughness::MaterialResources materialResources;
     // default the material textures

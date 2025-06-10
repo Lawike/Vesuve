@@ -159,6 +159,15 @@ struct GPUInstanceBuffers
   VkDeviceAddress materialIndexBufferAddress;
 };
 
+struct RTPushconstants
+{
+  glm::vec4 clearColor;
+  glm::vec3 lightPosition;
+  float lightIntensity;
+  int lightType;
+  int maxDepth;
+};
+
 struct DrawContext;
 
 // base class for a renderable dynamic object
@@ -202,7 +211,7 @@ struct Node : public IRenderable
   do                                                                 \
   {                                                                  \
     VkResult err = x;                                                \
-    if (err)                                                         \
+    if (err < 0)                                                     \
     {                                                                \
       fmt::print("Detected Vulkan error: {}", string_VkResult(err)); \
       abort();                                                       \

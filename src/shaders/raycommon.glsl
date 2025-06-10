@@ -9,6 +9,7 @@ struct hitPayload
   int  done;
   vec3 rayOrigin;
   vec3 rayDir;
+  vec3 weight;
 };
 
 struct Vertex {
@@ -22,8 +23,10 @@ struct Vertex {
 struct Material {
     vec4 colorFactors;
     vec4 metalRoughFactors;
+	vec3 emissiveFactors;
+	float emissivePower;
     float transparency;
-	float extra[55];
+	float extra[51];
 };
 
 struct shadowPayload

@@ -78,6 +78,7 @@ add_executable(
     "BottomLevelAccelerationStructure.hpp"
     "BottomLevelAccelerationStructure.cxx"
     "BottomLevelGeometry.hpp"
+    "EnumUi.hpp"
 )
 
 target_compile_definitions(Vesuve PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)

@@ -7,6 +7,21 @@
 #include "UserInterface.hpp"
 #include "VkEngine.hpp"
 
+using namespace UI;
+
+// Spécialisation pour RenderingMode
+template<> struct EnumTraits<VkEngine::RenderingMode>
+{
+  static constexpr std::array<VkEngine::RenderingMode, 3> values = {
+    VkEngine::RenderingMode::Rasterizer,
+    VkEngine::RenderingMode::Raytracing,
+    VkEngine::RenderingMode::Pathtracing};
+
+  static constexpr std::array<std::string_view, 3> names = {"Rasterization", "Raytracing", "Pathtracing"};
+
+  static constexpr std::string_view enum_name = "RenderingMode";
+};
+
 //--------------------------------------------------------------------------------------------------
 void UserInterface::init(VkEngine* engine)
 {
@@ -168,9 +183,24 @@ void UserInterface::displayLighting(VkEngine* engine)
 //--------------------------------------------------------------------------------------------------
 void UserInterface::displayRenderingModeSelector(VkEngine* engine)
 {
-  if (ImGui::Begin("Rendering Mode Selector"))
+  // Récupérer la valeur actuelle
+  auto currentMode = engine->_renderMode;
+
+  // Afficher la ComboBox
+  if (ComboBox("Rendering Mode", currentMode))
+  {
+    // La valeur a changé, mettre à jour le moteur
+    engine->_renderMode = currentMode;
+    ;
+  }
+
+  // Optionnel : afficher des informations
+  ImGui::Text("Current: %s", GetEnumName(currentMode).data());
+  /**
+    *   if (ImGui::Begin("Rendering Mode Selector"))
   {
     ImGui::Checkbox("Raytracing", (bool*)&engine->_isRaytracingEnabled);
   }
   ImGui::End();
+    */
 }

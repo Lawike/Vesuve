@@ -7,9 +7,11 @@ VulkanBackend::Raytracing::RaytracingPipeline::RaytracingPipeline(
   std::unique_ptr<Device>& device,
   std::unique_ptr<PipelineLayout>& layout,
   std::string raygenPath,
+  std::string pathTraceRaygenPath,
   std::string missPath,
   std::string shadowMissPath,
   std::string closestHitShader,
+  std::string pathTraceClosestHitPath,
   std::string anyHitShader0,
   std::string anyHitShader1
   /** ,std::string proceduralClosestHitShader,
@@ -17,9 +19,11 @@ VulkanBackend::Raytracing::RaytracingPipeline::RaytracingPipeline(
 {
   // Load shaders.
   vkutil::loadShaderModule(raygenPath.c_str(), device->getHandle(), &_raygenShader);
+  vkutil::loadShaderModule(pathTraceRaygenPath.c_str(), device->getHandle(), &_pathTraceRaygenShader);
   vkutil::loadShaderModule(missPath.c_str(), device->getHandle(), &_missShader);
   vkutil::loadShaderModule(shadowMissPath.c_str(), device->getHandle(), &_shadowMissShader);
   vkutil::loadShaderModule(closestHitShader.c_str(), device->getHandle(), &_closestHitShader);
+  vkutil::loadShaderModule(pathTraceClosestHitPath.c_str(), device->getHandle(), &_pathTraceClosestHitShader);
   vkutil::loadShaderModule(anyHitShader0.c_str(), device->getHandle(), &_anyHitShader0);
   vkutil::loadShaderModule(anyHitShader1.c_str(), device->getHandle(), &_anyHitShader1);
   //vkutil::loadShaderModule(proceduralClosestHitShader.c_str(), device->getHandle(), &_proceduralClosestHitShader);
@@ -36,6 +40,7 @@ VulkanBackend::Raytracing::RaytracingPipeline::RaytracingPipeline(
   pipelineInfo.pStages = _shaderStages.data();
   pipelineInfo.groupCount = static_cast<uint32_t>(_shaderGroups.size());
   pipelineInfo.pGroups = _shaderGroups.data();
+  _groupCount = _shaderGroups.size();
   // The ray tracing process can shoot rays from the camera, and a shadow ray can be shot from the
   // hit points of the camera rays, hence a recursion level of 2. This number should be kept as low
   // as possible for performance reasons. Even recursive ray tracing should be flattened into a loop
@@ -50,9 +55,11 @@ VulkanBackend::Raytracing::RaytracingPipeline::RaytracingPipeline(
   VK_CHECK(createRayTracingPipelines(device->getHandle(), nullptr, nullptr, 1, &pipelineInfo, nullptr, &_handle));
 
   vkDestroyShaderModule(device->getHandle(), _raygenShader, nullptr);
+  vkDestroyShaderModule(device->getHandle(), _pathTraceRaygenShader, nullptr);
   vkDestroyShaderModule(device->getHandle(), _missShader, nullptr);
   vkDestroyShaderModule(device->getHandle(), _shadowMissShader, nullptr);
   vkDestroyShaderModule(device->getHandle(), _closestHitShader, nullptr);
+  vkDestroyShaderModule(device->getHandle(), _pathTraceClosestHitShader, nullptr);
   vkDestroyShaderModule(device->getHandle(), _anyHitShader0, nullptr);
   vkDestroyShaderModule(device->getHandle(), _anyHitShader1, nullptr);
   //vkDestroyShaderModule(device->getHandle(), _proceduralClosestHitShader, nullptr);
@@ -68,7 +75,10 @@ void VulkanBackend::Raytracing::RaytracingPipeline::createShaderStages()
     createShaderStageInfo(VK_SHADER_STAGE_MISS_BIT_KHR, _shadowMissShader),
     createShaderStageInfo(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, _closestHitShader),
     createShaderStageInfo(VK_SHADER_STAGE_ANY_HIT_BIT_KHR, _anyHitShader0),
-    createShaderStageInfo(VK_SHADER_STAGE_ANY_HIT_BIT_KHR, _anyHitShader1)
+    createShaderStageInfo(VK_SHADER_STAGE_ANY_HIT_BIT_KHR, _anyHitShader1),
+    createShaderStageInfo(VK_SHADER_STAGE_RAYGEN_BIT_KHR, _pathTraceRaygenShader),
+    createShaderStageInfo(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, _pathTraceClosestHitShader)
+
     /** ,createShaderStageInfo(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, _proceduralClosestHitShader),
     createShaderStageInfo(VK_SHADER_STAGE_INTERSECTION_BIT_KHR, _proceduralIntersectionShader)*/};
 }
@@ -141,6 +151,26 @@ void VulkanBackend::Raytracing::RaytracingPipeline::createShaderGroups()
   anyHitGroupInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
   _anyHitGroupIndex = 4;
 
+  VkRayTracingShaderGroupCreateInfoKHR pathTraceRayGenGroupInfo = {};
+  pathTraceRayGenGroupInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+  pathTraceRayGenGroupInfo.pNext = nullptr;
+  pathTraceRayGenGroupInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+  pathTraceRayGenGroupInfo.generalShader = 6;
+  pathTraceRayGenGroupInfo.closestHitShader = VK_SHADER_UNUSED_KHR;
+  pathTraceRayGenGroupInfo.anyHitShader = VK_SHADER_UNUSED_KHR;
+  pathTraceRayGenGroupInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
+  _pathTraceRaygenGroupIndex = 5;
+
+  VkRayTracingShaderGroupCreateInfoKHR pathTraceHitGroupInfo = {};
+  pathTraceHitGroupInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+  pathTraceHitGroupInfo.pNext = nullptr;
+  pathTraceHitGroupInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+  pathTraceHitGroupInfo.generalShader = VK_SHADER_UNUSED_KHR;
+  pathTraceHitGroupInfo.closestHitShader = 7;
+  pathTraceHitGroupInfo.anyHitShader = 4;
+  pathTraceHitGroupInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
+  _pathTraceHitGroupIndex = 6;
+
   /* VkRayTracingShaderGroupCreateInfoKHR proceduralHitGroupInfo = {};
   proceduralHitGroupInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
   proceduralHitGroupInfo.pNext = nullptr;
@@ -152,5 +182,12 @@ void VulkanBackend::Raytracing::RaytracingPipeline::createShaderGroups()
   _proceduralHitGroupIndex = 5;
   */
   _shaderGroups = {
-    rayGenGroupInfo, missGroupInfo, shadowMissGroupInfo, triangleHitGroupInfo, anyHitGroupInfo, /* proceduralHitGroupInfo*/};
+    rayGenGroupInfo,
+    missGroupInfo,
+    shadowMissGroupInfo,
+    triangleHitGroupInfo,
+    anyHitGroupInfo,
+    pathTraceRayGenGroupInfo,
+    pathTraceHitGroupInfo,
+    /* proceduralHitGroupInfo*/};
 }

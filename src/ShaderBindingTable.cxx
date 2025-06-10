@@ -51,7 +51,8 @@ VulkanBackend::Raytracing::ShaderBindingTable::ShaderBindingTable(
 
   // Generate the table.
   const uint32_t handleSize = properties->_pipelineProperties.shaderGroupHandleSize;
-  const size_t groupCount = rayGenPrograms.size() + missPrograms.size() + hitGroups.size();
+  const size_t groupCount = rayTracingPipeline->_groupCount;
+
   std::vector<uint8_t> shaderHandleStorage(groupCount * handleSize);
 
   auto getRayTracingShaderGroupHandlesKHR = vkloader::loadFunction<PFN_vkGetRayTracingShaderGroupHandlesKHR>(

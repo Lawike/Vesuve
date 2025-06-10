@@ -1,3 +1,4 @@
+#include <iostream>
 #include "PhysicalDevice.hpp"
 
 //--------------------------------------------------------------------------------------------------
@@ -42,22 +43,31 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
   //We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct features
   vkb::Instance vkbInstanceHandle = instance->getHandle();
   vkb::PhysicalDeviceSelector selector{vkbInstanceHandle};
-  _vkbHandle = selector.set_minimum_version(1, 3)
-                 .set_required_features_13(_features13)
-                 .set_required_features_12(_features12)
-                 .set_required_features(_features)
-                 .add_required_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
-                 .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
-                 .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
-                 .add_required_extension(VK_KHR_SPIRV_1_4_EXTENSION_NAME)
-                 .add_required_extension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME)
-                 .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
-                 .add_required_extension(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME)
-                 .add_required_extension_features(accelerationStructureFeatures)
-                 .add_required_extension_features(rayTracingFeatures)
-                 .add_required_extension_features(swapChainMaintenanceFeatures)
-                 .add_required_extension_features(RTPositionFetchFeatures)
-                 .set_surface(surface)
-                 .select()
-                 .value();
+  auto physicalDeviceResult = selector.set_minimum_version(1, 3)
+                                .set_required_features_13(_features13)
+                                .set_required_features_12(_features12)
+                                .set_required_features(_features)
+                                .add_required_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
+                                .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+                                .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
+                                .add_required_extension(VK_KHR_SPIRV_1_4_EXTENSION_NAME)
+                                .add_required_extension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME)
+                                .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
+                                .add_required_extension(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME)
+                                .add_required_extension_features(accelerationStructureFeatures)
+                                .add_required_extension_features(rayTracingFeatures)
+                                .add_required_extension_features(swapChainMaintenanceFeatures)
+                                .add_required_extension_features(RTPositionFetchFeatures)
+                                .set_surface(surface)
+                                .select();
+
+  if (!physicalDeviceResult)
+  {
+    // Log error and abort
+    std::cerr << "Failed to pick the vulkan Physical device: " << physicalDeviceResult.error().message() << std::endl;
+  }
+  else
+  {
+    _vkbHandle = physicalDeviceResult.value();
+  }
 }
