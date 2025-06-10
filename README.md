@@ -18,7 +18,8 @@ It is highly WIP and mostly a way for me to learn computer graphics and the API.
   - [x] Miss Shader
   - [x] Any Hit Shader
   - [x] Antialiasing
-  - [ ] Reflections
+  - [x] Reflections
+  - [ ] Path Tracing
 ## Dependencies
 Most of the dependencies are retrieved using CMake FetchContent. They should be downloaded when configuring the CMake project.
 The only prerequisite are [CMake](https://cmake.org/download/) and the [Vulkan SDK](https://vulkan.lunarg.com/) that must be installed on your environment.
