@@ -27,7 +27,10 @@ layout(set = 0, binding = 1) uniform sampler2D allTextures[];
 layout(set = 1, binding = 0) uniform GLTFMaterialData{   
     vec4 colorFactors;
     vec4 metalRoughFactors;
+	vec3 emissiveFactors;
+	float emissivePower;
     float transparency;
+	float extra[51];
 } materialData;
 layout(set = 1, binding = 1) uniform sampler2D colorTex;
 layout(set = 1, binding = 2) uniform sampler2D metalRoughTex;

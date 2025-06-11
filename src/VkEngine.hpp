@@ -91,7 +91,7 @@ class VkEngine
   int _frameNumber{0};
   bool _stopRendering{false};
   bool _isRaytracingEnabled{false};
-  RenderingMode _renderMode{RenderingMode::Rasterizer};
+  RenderingMode _renderMode{RenderingMode::Raytracing};
   RenderingMode _previousFrameRenderMode{RenderingMode::Rasterizer};
 
   uint32_t maxNbOfFramesRT = 10;

@@ -39,6 +39,10 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
   RTPositionFetchFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_POSITION_FETCH_FEATURES_KHR;
   RTPositionFetchFeatures.rayTracingPositionFetch = true;
 
+  // Enable shader clock for path tracing (used in seed)
+  VkPhysicalDeviceShaderClockFeaturesKHR shaderClockFeatures{};
+  shaderClockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR;
+  shaderClockFeatures.shaderSubgroupClock = true;
   //use vkbootstrap to select a gpu.
   //We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct features
   vkb::Instance vkbInstanceHandle = instance->getHandle();
@@ -54,10 +58,12 @@ VulkanBackend::PhysicalDevice::PhysicalDevice(std::unique_ptr<Instance>& instanc
                                 .add_required_extension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME)
                                 .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
                                 .add_required_extension(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME)
+                                .add_required_extension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME)
                                 .add_required_extension_features(accelerationStructureFeatures)
                                 .add_required_extension_features(rayTracingFeatures)
                                 .add_required_extension_features(swapChainMaintenanceFeatures)
                                 .add_required_extension_features(RTPositionFetchFeatures)
+                                .add_required_extension_features(shaderClockFeatures)
                                 .set_surface(surface)
                                 .select();
 

@@ -1,6 +1,8 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_ARB_shader_clock : enable
+
 #include "raycommon.glsl"
 #include "random.glsl"
 
@@ -35,7 +37,7 @@ void main()
     /**for(int smpl = 0; smpl < NBSAMPLES; smpl++)
     {**/
         // Initialize the random number generator
-        uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, ubo.frameIndex);
+        uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(clockARB()));
 
         float r1 = rnd(seed);
         float r2 = rnd(seed);
@@ -59,6 +61,9 @@ void main()
         prd.rayOrigin    = origin.xyz;
         prd.rayDir = direction.xyz;
         prd.weight       = vec3(0);
+        prd.attenuation = vec3(1.f, 1.f, 1.f);
+
+        vec3 attenuation = prd.attenuation;
 
         vec3 curWeight = vec3(1);
         for (; prd.depth < 10; prd.depth++) {
@@ -74,7 +79,7 @@ void main()
               tMax,           // ray max range
               0               // payload (location = 0)
             );
-            hitValues += prd.hitValue * curWeight;
+            hitValues += prd.hitValue * curWeight * attenuation;
             curWeight *= prd.weight;
         }
     //}

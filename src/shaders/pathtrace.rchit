@@ -112,4 +112,15 @@ void main()
   prd.rayDir = rayDirection;
   prd.hitValue     = emittance;
   prd.weight       = BRDF * cos_theta / p;
+
+  // Reflection
+  if(mat.metalRoughFactors.y <= 0.1)
+  {
+    vec3 origin   = worldPos;
+    vec3 rayDir   = reflect(gl_WorldRayDirectionEXT, worldNormal);
+    prd.attenuation *= mat.metalRoughFactors.x;
+    prd.done = 0;
+    prd.rayOrigin = origin;
+    prd.rayDir = rayDir;
+  }
 }

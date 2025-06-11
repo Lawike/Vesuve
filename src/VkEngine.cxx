@@ -1600,11 +1600,12 @@ void VkEngine::initDefaultData()
   //_loadedScenes.emplace("teapot", vkloader::loadGltf(this, "../assets/scaled_teapot.glb").value());
   //_loadedScenes.emplace("cube", vkloader::loadGltf(this, "../assets/cube.glb").value());
   //_loadedScenes.emplace("reflective_scene", vkloader::loadGltf(this, "../assets/reflective_scene.glb").value());
-  _loadedScenes.emplace("cornell_box", vkloader::loadGltf(this, "../assets/cornell_box.glb").value());
+  //_loadedScenes.emplace("cornell_box", vkloader::loadGltf(this, "../assets/cornell_box.glb").value());
+  _loadedScenes.emplace("cornell_sphere", vkloader::loadGltf(this, "../assets/cornell_sphere.glb").value());
 
 
   _loadedSceneBuffersAddress = createBuffer(
-    sizeof(GPUInstanceBuffers) * _loadedScenes["cornell_box"]->meshes.size(),
+    sizeof(GPUInstanceBuffers) * _loadedScenes["cornell_sphere"]->meshes.size(),
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
     VMA_MEMORY_USAGE_AUTO);
 
