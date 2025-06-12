@@ -15,5 +15,6 @@ void main()
 	  prd.hitValue = vec3(0.01);  // Tiny contribution from environment
 	}
 	// Ending trace
+	prd.done = 1;
 	prd.depth = 100;    
 }

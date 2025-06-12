@@ -56,6 +56,8 @@ vec3 lcolor = sceneData.lightColor.xyz;
 float lpow = sceneData.lightPower;
 vec3 lpos = sceneData.lightPosition.xyz;
 
+int M = 32;
+
 void main()
 {
   GPUInstanceBuffers instance = instanceBuffers.buffersAdresses[gl_InstanceCustomIndexEXT];
@@ -67,6 +69,7 @@ void main()
   uint matIndex = materialIndices.i[gl_PrimitiveID];
   Material mat = materials.m[matIndex];
 
+  // Get triangle vertices
   uint triIndex0 = indices.i[gl_PrimitiveID*3 + 0];
   uint triIndex1 = indices.i[gl_PrimitiveID*3 + 1];
   uint triIndex2 = indices.i[gl_PrimitiveID*3 + 2];
@@ -86,19 +89,45 @@ void main()
   const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
   // Computing the coordinates of the hit position
-  //vec3 geoNormal = cross(v1 - v0, v2 - v0);
+  // Interpolate position and normal
   vec3 normal = n0 * barycentrics.x + n1 * barycentrics.y + n2 * barycentrics.z;
-
   const vec3 position = v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
   const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(position, 1.0));  // Transforming the position to world space
 
   // Computing the normal at hit position
   const vec3 worldNormal = normalize(vec3(normal * gl_WorldToObjectEXT));  // Transforming the normal to world space
+
+  // Material properties
+  vec3 albedo = mat.colorFactors.xyz;
+  float metallic = mat.metalRoughFactors.x;
+  float roughness = mat.metalRoughFactors.y;
   vec3 emittance = mat.emissiveFactors * mat.emissivePower;
 
-  // Pick a random direction from here and keep going.
-  vec3 tangent, bitangent;
-  createCoordinateSystem(worldNormal, tangent, bitangent);
+  // Set emitted light
+  prd.hitValue = emittance;
+
+  // Determine material type and handle accordingly
+  bool isEmissive = dot(emittance, emittance) > 0.0;
+  bool isMirror = (metallic > 0.9 && roughness < 0.1);
+
+  if (isEmissive && prd.depth == 0) {
+    // Direct hit on light source - terminate path
+    prd.done = 1;
+    return;
+  }
+  if (isMirror) {
+    // Perfect mirror reflection
+    vec3 rayDir = reflect(gl_WorldRayDirectionEXT, worldNormal);
+        
+    prd.rayOrigin = worldPos;
+    prd.rayDir    = rayDir;
+    prd.weight    = albedo;
+    prd.done      = 0;
+  } else {
+    // Lambertian diffuse reflection
+    // Pick a random direction from here and keep going.
+    vec3 tangent, bitangent;
+    createCoordinateSystem(worldNormal, tangent, bitangent);
   vec3 rayOrigin    = worldPos;
   vec3 rayDirection = samplingHemisphere(prd.seed, tangent, bitangent, worldNormal);
   const float cos_theta = dot(rayDirection, worldNormal);
@@ -112,15 +141,5 @@ void main()
   prd.rayDir = rayDirection;
   prd.hitValue     = emittance;
   prd.weight       = BRDF * cos_theta / p;
-
-  // Reflection
-  if(mat.metalRoughFactors.y <= 0.1)
-  {
-    vec3 origin   = worldPos;
-    vec3 rayDir   = reflect(gl_WorldRayDirectionEXT, worldNormal);
-    prd.attenuation *= mat.metalRoughFactors.x;
-    prd.done = 0;
-    prd.rayOrigin = origin;
-    prd.rayDir = rayDir;
   }
 }
