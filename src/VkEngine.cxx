@@ -452,10 +452,7 @@ void VkEngine::drawRaytracing(VkCommandBuffer cmd)
   // Bind ray tracing pipeline.
   RTPushconstants rtPushConstant{};
   rtPushConstant.clearColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-  rtPushConstant.lightPosition = _sceneData.lightPosition;
-  rtPushConstant.lightIntensity = _sceneData.lightPower;
-  rtPushConstant.lightType = 0;
-  rtPushConstant.maxDepth = 100;
+  rtPushConstant.emissiveTrianglesCount = _emissiveTrianglesCount;
 
   vkCmdPushConstants(
     cmd,
@@ -701,7 +698,7 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
   }
   else
   {
-    if (_frameNumber < maxNbOfFramesRT || _renderMode == RenderingMode::Pathtracing)
+    if (_frameNumber < maxNbOfFramesRT /*||  _renderMode == RenderingMode::Pathtracing*/)
     {
       this->drawRaytracing(cmd);
       _lastSelectedSceneName = _selectedSceneName;
@@ -1090,6 +1087,7 @@ void VkEngine::updateRaytracingDescriptors()
     buffers.indexBufferAddress = mesh.second->meshBuffers.indexBufferAddress;
     buffers.materialBufferAdress = _loadedScenes[_selectedSceneName]->materialDataBufferAddress;
     buffers.materialIndexBufferAddress = mesh.second->meshBuffers.materialIndicesBufferAddress;
+    buffers.emissiveTrianglesBufferAddress = _emissiveTrianglesBufferAddress;
     instanceBuffers.push_back(buffers);
   }
   // Update the set
@@ -1603,13 +1601,31 @@ void VkEngine::initDefaultData()
   //_loadedScenes.emplace("cornell_box", vkloader::loadGltf(this, "../assets/cornell_box.glb").value());
   _loadedScenes.emplace("cornell_sphere", vkloader::loadGltf(this, "../assets/cornell_sphere.glb").value());
 
+  _selectedSceneName = "cornell_sphere";
+  _emissiveTrianglesCount = _loadedScenes[_selectedSceneName]->emissiveTriangles.size();
 
   _loadedSceneBuffersAddress = createBuffer(
-    sizeof(GPUInstanceBuffers) * _loadedScenes["cornell_sphere"]->meshes.size(),
+    sizeof(GPUInstanceBuffers) * _loadedScenes[_selectedSceneName]->meshes.size(),
     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
     VMA_MEMORY_USAGE_AUTO);
 
-  _deletionQueue.push([=, this]() { destroyBuffer(_loadedSceneBuffersAddress); });
+  _emissiveTrianglesBuffer = createBuffer(
+    sizeof(EmissiveTriangle) * _loadedScenes[_selectedSceneName]->emissiveTriangles.size(),
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    VMA_MEMORY_USAGE_AUTO);
+  DebugUtils::SetObjectName(_emissiveTrianglesBuffer.buffer, "Emissive triangles buffer", _device->getHandle());
+  //find the address of the material indices buffer
+  VkBufferDeviceAddressInfo emissiveTrianglesBufferAddressInfo{
+    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = _emissiveTrianglesBuffer.buffer};
+  _emissiveTrianglesBufferAddress = vkGetBufferDeviceAddress(_device->getHandle(), &emissiveTrianglesBufferAddressInfo);
+  updateEmisssiveTriangles();
+
+  _deletionQueue.push(
+    [=, this]()
+    {
+      destroyBuffer(_loadedSceneBuffersAddress);
+      destroyBuffer(_emissiveTrianglesBuffer);
+    });
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1793,10 +1809,45 @@ void VkEngine::updateFrame()
   _frameNumber++;
 }
 
+//--------------------------------------------------------------------------------------------------
 void VkEngine::updateAccelerationStructure(uint32_t index, VkCommandBuffer cmd)
 {
 }
 
+//--------------------------------------------------------------------------------------------------
+void VkEngine::updateEmisssiveTriangles()
+{
+  std::unique_ptr<CommandPool> pool = std::make_unique<CommandPool>(_device);
+  std::unique_ptr<SingleTimeCommand> cmd =
+    std::make_unique<SingleTimeCommand>(_device->getHandle(), pool->getHandle(), _device->getGraphicsQueue());
+  cmd->begin();
+  this->copyBuffer(cmd->buffer, _emissiveTrianglesBuffer, _loadedScenes[_selectedSceneName]->emissiveTriangles);
+
+  // Make sure the copy of the emissiveTriangles buffer are copied before continuing
+  VkBufferMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;  // We wrote with vkCmdCopyBuffer
+  barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;     // We want shaders to read it
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.buffer = _emissiveTrianglesBuffer.buffer;
+  barrier.offset = 0;
+  barrier.size = VK_WHOLE_SIZE;
+
+  vkCmdPipelineBarrier(
+    cmd->buffer,
+    VK_PIPELINE_STAGE_TRANSFER_BIT,                // after transfer writes...
+    VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,  // ...before raytracing shader reads
+    0,
+    0,
+    nullptr,
+    1,
+    &barrier,
+    0,
+    nullptr);
+  cmd->end();
+  vkDestroyCommandPool(_device->getHandle(), pool->getHandle(), nullptr);
+}
 //--------------------------------------------------------------------------------------------------
 // Make the desired instance of the TLAS visible and hides every other
 /**void VkEngine::updateAccelerationStructure(uint32_t instanceIndex, VkCommandBuffer cmd)

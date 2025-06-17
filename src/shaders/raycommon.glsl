@@ -39,4 +39,17 @@ struct GPUInstanceBuffers {
 	uint64_t indexBufferAddress;
 	uint64_t materialBufferAddress;
 	uint64_t materialIndicesBufferAddress;
+	uint64_t emissiveTrianglesBufferAddress;
+};
+
+struct EmissiveTriangle
+{
+  vec4 x0;
+  vec4 x1;
+  vec4 x2;
+  vec4 normal;
+  vec4 emission;
+  float area;
+  float importance;  // area × luminance of emission
+  float extra[2]; // 16 bytes align
 };

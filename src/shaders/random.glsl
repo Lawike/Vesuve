@@ -1,3 +1,5 @@
+#include "raycommon.glsl"
+
 // Generate a random unsigned int from two unsigned int values, using 16 pairs
 // of rounds of the Tiny Encryption Algorithm. See Zafar, Olano, and Curtis,
 // "GPU Random Numbers via the Tiny Encryption Algorithm"
@@ -61,4 +63,29 @@ void createCoordinateSystem(in vec3 N, out vec3 Nt, out vec3 Nb)
   else
     Nt = vec3(0, -N.z, N.y) / sqrt(N.y * N.y + N.z * N.z);
   Nb = cross(N, Nt);
+}
+
+struct PathToLight
+{
+    vec3 prev;
+    vec3 hit;
+    EmissiveTriangle next;
+};
+
+struct Sample
+{
+    PathToLight x;
+    float W;
+};
+
+struct Reservoir {
+    PathToLight sampleOut;
+    float WSum;
+};
+
+void addSample(in PathToLight x,in float w, inout Reservoir r, inout uint seed) {
+    r.WSum += w;
+    if (rnd(seed) < w/r.WSum) {
+        r.sampleOut = x;
+    }
 }

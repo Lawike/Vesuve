@@ -157,16 +157,27 @@ struct GPUInstanceBuffers
   VkDeviceAddress indexBufferAddress;
   VkDeviceAddress materialBufferAdress;
   VkDeviceAddress materialIndexBufferAddress;
+  VkDeviceAddress emissiveTrianglesBufferAddress;
 };
 
 struct RTPushconstants
 {
   glm::vec4 clearColor;
-  glm::vec3 lightPosition;
-  float lightIntensity;
-  int lightType;
-  int maxDepth;
+  uint32_t emissiveTrianglesCount;
 };
+
+struct alignas(16) EmissiveTriangle
+{
+  glm::vec4 x0;
+  glm::vec4 x1;
+  glm::vec4 x2;
+  glm::vec4 normal;
+  glm::vec4 emission;
+  float area;
+  float importance;  // area × luminance of emission
+  float extra[2];    //16 bytes align
+};
+static_assert(sizeof(EmissiveTriangle) % 16 == 0);
 
 struct DrawContext;
 

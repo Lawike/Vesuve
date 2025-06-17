@@ -212,6 +212,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
     for (auto&& p : mesh.primitives)
     {
       GeoSurface newSurface;
+      bool isEmissive = false;
       newSurface.startIndex = (uint32_t)indices.size();
       newSurface.count = (uint32_t)gltf.accessors[p.indicesAccessor.value()].count;
 
@@ -223,6 +224,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
       {
         newSurface.material = materials[p.materialIndex.value()];
         matIndex = p.materialIndex.value();
+        GLTFMetallicRoughness::MaterialConstants matp = sceneMaterialConstants[p.materialIndex.value()];
+        isEmissive = matp.emissiveFactors.r + matp.emissiveFactors.g + matp.emissiveFactors.b > 0;
       }
       else
       {
@@ -310,6 +313,43 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
       newSurface.bounds.extents = (maxpos - minpos) / 2.f;
       newSurface.bounds.sphereRadius = glm::length(newSurface.bounds.extents);
       newmesh->surfaces.push_back(newSurface);
+
+      if (isEmissive)
+      {
+        for (uint32_t i = 0; i < newSurface.count; i += 3)
+        {
+          uint32_t i0 = indices[newSurface.startIndex + i];
+          uint32_t i1 = indices[newSurface.startIndex + i + 1];
+          uint32_t i2 = indices[newSurface.startIndex + i + 2];
+
+          glm::vec3 v0 = vertices[i0].position;
+          glm::vec3 v1 = vertices[i1].position;
+          glm::vec3 v2 = vertices[i2].position;
+
+          glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+          float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
+
+          glm::vec3 emissionColor = {
+            sceneMaterialConstants[matIndex].emissiveFactors.x,
+            sceneMaterialConstants[matIndex].emissiveFactors.y,
+            sceneMaterialConstants[matIndex].emissiveFactors.z};
+          float strength = sceneMaterialConstants[matIndex].emissivePower;
+
+          EmissiveTriangle tri;
+          tri.x0 = glm::vec4(v0, 1);
+          tri.x1 = glm::vec4(v1, 1);
+          tri.x2 = glm::vec4(v2, 1);
+
+          tri.normal = glm::vec4(normal.x, normal.y, normal.z, 1);
+          tri.emission = glm::vec4(emissionColor.x, emissionColor.y, emissionColor.z, 1) * strength;
+          tri.area = area;
+          tri.extra[0] = 0;
+          tri.extra[1] = 0;
+          // Laisse tri.cdf vide pour l'instant, on le calcule après
+
+          scene->emissiveTriangles.push_back(tri);  // <-- Ajoute à ta scène
+        }
+      }
     }
 
     newmesh->meshBuffers = engine->uploadMesh(indices, vertices, newmesh->materialIndices, newmesh->name);
@@ -374,6 +414,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
       node.second->refreshTransform(glm::mat4{1.f});
     }
   }
+
+  scene->buildCDF();
+
   return scene;
 }
 
@@ -569,6 +612,24 @@ void LoadedGLTF::clearAll()
   for (auto& sampler : samplers)
   {
     vkDestroySampler(dv, sampler, nullptr);
+  }
+}
+
+void LoadedGLTF::buildCDF()
+{
+  float total = 0.0f;
+
+  for (auto& tri : this->emissiveTriangles)
+  {
+    float luminance =
+      glm::dot(glm::vec3(tri.emission), glm::vec3(0.2126f, 0.7152f, 0.0722f));  // ITU-R BT.709 standard luminance coef
+    tri.importance = tri.area * luminance;
+    total += tri.importance;
+  }
+
+  for (auto& tri : this->emissiveTriangles)
+  {
+    tri.importance /= total;
   }
 }
 

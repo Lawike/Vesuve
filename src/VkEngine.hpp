@@ -94,7 +94,7 @@ class VkEngine
   RenderingMode _renderMode{RenderingMode::Raytracing};
   RenderingMode _previousFrameRenderMode{RenderingMode::Rasterizer};
 
-  uint32_t maxNbOfFramesRT = 10;
+  uint32_t maxNbOfFramesRT = 1;
   VkExtent2D _windowExtent{1700, 900};
 
   std::unique_ptr<Window> _window;
@@ -202,6 +202,9 @@ class VkEngine
   AllocatedBuffer _topScratchBuffer;
   std::vector<AllocatedBuffer> _instancesBuffers;
   AllocatedBuffer _loadedSceneBuffersAddress;
+  AllocatedBuffer _emissiveTrianglesBuffer;
+  VkDeviceAddress _emissiveTrianglesBufferAddress;
+  uint32_t _emissiveTrianglesCount;
 
   static VkEngine& Get();
 
@@ -273,6 +276,7 @@ class VkEngine
   void createDepthImage();
   void updateFrame();
   void updateAccelerationStructure(uint32_t index, VkCommandBuffer cmd);
+  void updateEmisssiveTriangles();
 
   //Debug tools
   MeshAsset createTestTriangleMesh();

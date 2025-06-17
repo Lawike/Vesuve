@@ -4,7 +4,6 @@
 #extension GL_EXT_scalar_block_layout : enable
 
 #include "random.glsl"
-#include "raycommon.glsl"
 
 #ifdef PAYLOAD_0
 layout(location = 0) rayPayloadInEXT hitPayload prd;
