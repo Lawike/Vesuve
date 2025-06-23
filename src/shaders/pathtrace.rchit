@@ -28,7 +28,7 @@ layout(set = 1, binding = 0) uniform SceneData
 	float shininess;
 	float screenGamma;
 	float aspectRatio;
-    uint frameIndex;
+	uint frameIndex;
 } sceneData;
 
 layout(set = 0, binding = 2, scalar) buffer GPUInstanceBuffers_ { GPUInstanceBuffers buffersAdresses[]; } instanceBuffers;
@@ -66,82 +66,118 @@ float lpow = sceneData.lightPower;
 vec3 lpos = sceneData.lightPosition.xyz;
 vec3 camPos = sceneData.cameraPosition.xyz;
 
-int M = 32;
+int M = 256;
 
 float luminance(float r, float g, float b) {
 	return 0.2126f * r + 0.7152f * g + 0.0722f * b;
 }
 
-// Ldirect(x) = Li(x,l) * Fr(x, w_i, w_o) * cos(theta_i) * G / p(l)
-vec3 fresnelSchlick(float cosTheta, vec3 F0)
-{
-    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+float luminance(vec3 rgb) {
+	return 0.2126f * rgb.r + 0.7152f * rgb.g + 0.0722f * rgb.b;
 }
 
-vec3 directLighting(
-	vec3 worldPos, vec3 lightPos, vec3 camPos, vec3 normal, vec3 lightNormal, bool useLightNormal,
-	vec3 emission, vec3 albedo, float roughness, float metallic
+
+vec3 EvaluatePbrLighting(
+	vec3 worldPos, vec3 lightDir, vec3 camPos, vec3 normal,
+	vec3 emission, vec3 albedo, float roughness, float metallic, vec3 lightNormal, float dist
 ) {
-	vec3 toLight = lightPos - worldPos;
-	float distSquared = dot(toLight, toLight);
-	float dist = sqrt(distSquared);
+		float dist2 =  dist*dist;
+		
+		// View vector (from hit to camera)
+		vec3 V = normalize(camPos - worldPos);
+		vec3 H = normalize(V + lightDir);
 
-	vec3 lightDir = toLight / dist;
+		// Cosines
+		float NdotL = max(dot(normal, lightDir), 0.0);
+		float NdotV = max(dot(normal, V), 0.0);
 
-	vec3 viewDir = normalize(camPos - worldPos);
-	vec3 halfVec = normalize(lightDir + viewDir);
+		// GGX / Cook-Torrance specular
+        float rough2 = roughness * roughness;
+        float NdotH = max(dot(normal, H), 0.0);
+        float VdotH = max(dot(V, H), 0.0);
 
-	// Cosines
-    float NdotL = max(dot(normal, lightDir), 0.0);
-    float NdotV = max(dot(normal, viewDir), 0.0);
-    float NdotH = max(dot(normal, halfVec), 0.0);
-    float LdotH = max(dot(lightDir, halfVec), 0.0);
-    float LdotN_light = max(dot(-lightDir, lightNormal), 0.0); // light's cosine
+        // Normal Distribution (GGX)
+        float alpha2 = rough2 * rough2;
+        float denom = (NdotH * NdotH) * (alpha2 - 1.0) + 1.0;
+        float D = alpha2 / max((M_PI * denom * denom), 1e-6);
 
-	// Visibility test (shadow ray)
-    /**if (!isVisible(worldPosition, lightPosition)) {
-        return vec3(0.0);
-    }*/
+        // Geometry (Smith-Schlick-GGX)
+        float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+        float G_V = NdotV / (NdotV * (1.0 - k) + k);
+        float G_L = NdotL / (NdotL * (1.0 - k) + k);
+        float G = G_V * G_L;
 
-	// Geometry term (area-based solid angle)
-    float G = (LdotN_light * NdotL) / max(distSquared, 0.001);
+        // Fresnel (Schlick)
+        vec3 F0 = mix(vec3(0.04), albedo, metallic);
+        vec3 F = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
 
-	// Cook-Torrance BRDF
-    vec3 F0 = mix(vec3(0.04), albedo, metallic);
-	vec3 F = fresnelSchlick(LdotH, F0);
+        // Specular BRDF
+        vec3 specular = (D * G * F) / (4.0 * NdotV * NdotL + 1e-6);
 
-	float alpha = roughness * roughness;
-    float alpha2 = alpha * alpha;
+        // Diffuse (Lambert modulated by energy conservation)
+        vec3 kS = F;
+        vec3 kD = (1.0 - kS) * (1.0 - metallic);
+        vec3 diffuse = kD * (albedo / M_PI);
 
-	float D = alpha2 / (M_PI * pow((NdotH * NdotH * (alpha2 - 1.0) + 1.0), 2.0));
+        // Total BRDF (diffuse + specular)
+        vec3 BRDF = diffuse + specular;
 
-	float k = alpha / 2.0;
-    float G1V = NdotV / (NdotV * (1.0 - k) + k);
-    float G1L = NdotL / (NdotL * (1.0 - k) + k);
-    float G_Smith = G1V * G1L;
+        // Cosine at light
+        float cosLight = max(dot(lightNormal, -lightDir), 0.0);
 
-	vec3 specular = (D * F * G_Smith) / (4.0 * max(NdotV * NdotL, 0.001));
-
-	vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0 - metallic;
-
-	vec3 diffuse = (albedo / M_PI);
-
-    // Final contribution
-    vec3 brdf = kD * diffuse + specular;
-    vec3 radiance = emission;
-
-    vec3 contribution = brdf * radiance * G;
-
-    return contribution;
+        // Accumulate light: include cosines and distance^2
+        vec3 contrib = emission * BRDF * NdotL * cosLight / dist2;
+        return contrib;
 }
 
 vec3 sampleTrianglePoint(in vec3 x0, in vec3 x1, in vec3 x2, inout uint seed)
 {
-	float a = rnd(seed);
-	float b = rnd(seed);
-	return x0 + a * ( x1 - x0 ) + b * ( x2 - x0);
+	float r1 = rnd(seed);
+	float r2 = rnd(seed);
+	float sqrt_r1 = sqrt(r1);
+	return (1.0 - sqrt_r1) * x0 + (sqrt_r1 * (1.0 - r2)) * x1 + (r2 * sqrt_r1) * x2;
+}
+
+bool visibilityTest(vec3 lightDir, float lightDistance, vec3 worldPos)
+{
+	float tMin   = 0.001;
+	float tMax   = lightDistance;
+	vec3  origin = worldPos;
+	vec3  rayDir = lightDir;
+	uint  flags  = gl_RayFlagsSkipClosestHitShaderEXT;
+	prdShadow.isHit = true;
+	prdShadow.seed  = prd.seed;
+	traceRayEXT(topLevelAS,  // acceleration structure
+				flags,       // rayFlags
+				0xFF,        // cullMask
+				0,           // sbtRecordOffset
+				0,           // sbtRecordStride
+				1,           // missIndex
+				origin,      // ray origin
+				tMin,        // ray min range
+				rayDir,      // ray direction
+				tMax,        // ray max range
+				1            // payload (location = 1)
+	);
+	prd.seed = prdShadow.seed; 
+	if(prdShadow.isHit)
+	{
+		return false;
+	}
+	return true;
+}
+
+
+vec3 lambertDiffuseLight(vec3 lightDir, vec3 lightNormal, float dist, vec3 baseColor, vec3 lightEmission, vec3 normal)
+{
+	float dist2 = dist * dist;
+	float NdotL = max(dot(normal, lightDir), 0.0);
+    vec3 diffuseBRDF = baseColor / M_PI;
+    // Cosine of angle at the light surface
+    float cosLight = max(dot(lightNormal, -lightDir), 0.0);
+    // Geometry/attenuation: include cosines and distance^2 (area factor can be applied separately)
+    vec3 contrib = lightEmission * diffuseBRDF * NdotL * cosLight / dist2;
+    return contrib;
 }
 
 void main()
@@ -182,7 +218,7 @@ void main()
   const vec3 worldPos = vec3(gl_ObjectToWorldEXT * vec4(position, 1.0));  // Transforming the position to world space
 
   // Computing the normal at hit position
-  const vec3 worldNormal = normalize(vec3(normal * gl_WorldToObjectEXT));  // Transforming the normal to world space
+  const vec3 worldNormal = normalize(vec3(normal * gl_WorldToObjectEXT));  // Transforming the normal to object space
 
   // Material properties
   vec3 albedo = mat.colorFactors.xyz;
@@ -191,7 +227,8 @@ void main()
   vec3 emittance = mat.emissiveFactors * mat.emissivePower;
 
   // Set emitted light
-  prd.hitValue = emittance;
+  prd.hitValue  = emittance;
+  prd.done      = 0;
 
   // Determine material type and handle accordingly
   bool isEmissive = dot(emittance, emittance) > 0.0;
@@ -205,11 +242,10 @@ void main()
   if (isMirror) {
     // Perfect mirror reflection
     vec3 rayDir = reflect(gl_WorldRayDirectionEXT, worldNormal);
-        
+    prd.attenuation *= mat.metalRoughFactors.x;    
     prd.rayOrigin = worldPos;
     prd.rayDir    = rayDir;
-    prd.weight    = albedo;
-    prd.done      = 0;
+    prd.weight	  = albedo;
   } else {
 	// Lambertian diffuse reflection
 
@@ -217,82 +253,79 @@ void main()
 	vec3 tangent, bitangent;
 	createCoordinateSystem(worldNormal, tangent, bitangent);
 	vec3 rayOrigin    = worldPos;
+	// Sample rayDirection
 	vec3 rayDirection = samplingHemisphere(prd.seed, tangent, bitangent, worldNormal);
-	const float cos_theta = max(dot(worldNormal, rayDirection), 0.0);
-	float p = cos_theta / M_PI;
+	// Indirect contribution (ignored for now)
+	float cos_theta = abs(dot(worldNormal, rayDirection));
+	float pdf_dir = cos_theta / M_PI;
 	vec3 albedo = mat.colorFactors.xyz;
 	vec3 BRDF = albedo / M_PI;
-
 	uint lightCount = PushConstants.emissiveTrianglesCount;
 	
-	if (lightCount > 0 ) {
-
+	Reservoir r;
+	r.WSum = 0.f;
+	for (int i = 0; i < M; i++) {
+		// Sample light from all the emissive triangle of the scene
 		uint lightToSample = min(uint(rnd(prd.seed) * float(lightCount)), lightCount - 1);
 		EmissiveTriangle tri = triBuf.e[lightToSample];
-		float emissionLum = luminance(tri.emission.r, tri.emission.g, tri.emission.b); 
+		float pdf_light = 1.0f /  float(lightCount); 
 
-		// Sample triangle point
+		// Sample area light point (triangle sampling)
 		vec3 triPoint = sampleTrianglePoint(tri.x0.xyz, tri.x1.xyz, tri.x2.xyz, prd.seed);
+		vec3 lightDir = normalize(triPoint - worldPos);
+		float dist = distance(worldPos, triPoint);
+		float pdf_triangle = 1.0f / float(tri.area);
 
-		vec3 p_hat = directLighting(worldPos, triPoint, rayOrigin, worldNormal, tri.normal.xyz, false, tri.emission.xyz, albedo, roughness, metallic);
-		prd.hitValue = emittance;
+		// Evaluate direct lighting
+		vec3 f_x = EvaluatePbrLighting(rayOrigin, lightDir, camPos, worldNormal, tri.emission.xyz, albedo, roughness, metallic, tri.normal.xyz, dist);
+		
+		// Use luminance as a proportionnal target function
+		float dist2 = dist * dist;
+		float cosLight = max(dot(tri.normal.xyz, -lightDir), 1e-6);
+		float pdf_lum = dist2 / cosLight;
 
-		float wl = (1.0f/float(lightCount)) / ((1.0f/float(lightCount)) + p);
-		float wp = p / ((1.0f/float(lightCount)) + p);
+		// Generalized Balance heuristic
+		float pdf = pdf_light * pdf_triangle * pdf_lum;
 
-		prd.weight = p_hat / wl + (BRDF * cos_theta / wp);
+		float NdotL = max(dot(worldNormal, lightDir), 0.0);
+		float contrib = dot(f_x, vec3(NdotL));
 
-	} else {
-		prd.hitValue     = emittance;
-		prd.weight       = BRDF * cos_theta / p;
-	}
-    /**
-	PathToLight path;
-	path.prev = rayOrigin;
-	path.hit = worldPos;
-	path.next = tri;
-	float DIweight = 0.0;
-	float emissionLum = luminance(tri.emission.r, tri.emission.g, tri.emission.b); 
-
-	float p_hat = evaluatePHat(worldPos, tri.center.xyz, camPos, worldNormal, tri.normal.xyz, false, tri.importance, emissionLum, roughness, metallic);
-
-	if (isnan(p_hat)) {
-		p_hat = 1.0f;
-
-	/**
-	// Probability density function of samplingHemisphere choosing this rayDirection
-	int M = 42;
-	Reservoir r;
-	r.WSum = 0;
-
-   float albedoLum = luminance(albedo.r, albedo.g, albedo.b);
-
-	// Sample light and add to reservoir
-	for (int i = 0; i < M; i++) 
-	{
-
-
-		PathToLight path;
-		path.prev = rayOrigin;
+		float w =  luminance(f_x) * pdf / float(M);
+		
+		Sample path;
+		path.origin = prd.rayOrigin;
 		path.hit = worldPos;
-		path.next = tri;
-		float p = 1.0 / float(lightCount);
-		float weight = (1.0/42.0) * evaluatePHat(path.hit, tri.center.xyz, camPos, worldNormal, tri.normal.xyz, false, albedoLum, tri.importance, roughness, metallic) / p;
-		addSample(path, weight, r, prd.seed);
+		path.light = tri;
+		path.lightPos = triPoint;
+		path.bounceDir = rayDirection;
+		addSample(path, w, r, prd.seed);
 	}
-	// Compute the BRDF for this ray (assuming Lambertian reflection)
 
-	PathToLight path = r.sampleOut;
-	EmissiveTriangle tri = path.next;
+	Sample y = r.sampleOut;
 
-	float finalWeight = 1.0 / evaluatePHat(path.hit, tri.center.xyz, camPos, worldNormal, tri.normal.xyz, false, albedoLum, tri.importance, roughness, metallic) * r.WSum;
-	*/
+	// Evaluate lighting with visibility test
+	float dist = distance(worldPos, y.lightPos);
+	vec3 lightDir = normalize(y.lightPos - worldPos);
+	bool visibility = true;
+	vec3 f_y = vec3(0); //BRDF  ;
+	float W = 1.0f;// cos_theta / pdf_dir;
 
+	// Cosine of angle at hit point
+	float NdotL = max(dot(worldNormal, lightDir), 0.0);
+	if(NdotL > 0)
+	{
+		visibility = visibilityTest(lightDir, dist, worldPos);
+	}
+	if (visibility) {
+		f_y += EvaluatePbrLighting(rayOrigin, lightDir, camPos, worldNormal, y.light.emission.xyz, albedo, roughness, metallic, y.light.normal.xyz, dist); // Direct contribution
+		float p_y = max(luminance(f_y), 1e-6);
+		W = (1.0f / p_y) * r.WSum;
+	}
+	vec3 indirectContribution = BRDF * cos_theta / pdf_dir;
+	vec3 directContribution = f_y * W;
 
-	/**
-	prd.hitValue     = tri.emission.rgb;
-	prd.weight       = finalWeight;
-	*/
+	prd.hitValue	 = emittance;
+	prd.weight		 = directContribution;
 	prd.rayOrigin    = rayOrigin;
 	prd.rayDir       = rayDirection;
   }

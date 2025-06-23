@@ -698,7 +698,7 @@ void VkEngine::drawMain(VkCommandBuffer cmd)
   }
   else
   {
-    if (_frameNumber < maxNbOfFramesRT /*||  _renderMode == RenderingMode::Pathtracing*/)
+    if (_frameNumber < maxNbOfFramesRT || _renderMode == RenderingMode::Pathtracing)
     {
       this->drawRaytracing(cmd);
       _lastSelectedSceneName = _selectedSceneName;
@@ -1632,7 +1632,7 @@ void VkEngine::initDefaultData()
 void VkEngine::initMainCamera()
 {
   _mainCamera.velocity = glm::vec3(0.f);
-  _mainCamera.position = glm::vec3(0.f, -0.f, 5.f);
+  _mainCamera.position = glm::vec3(0.f, 1.5f, 3.f);
   _mainCamera.yaw = 0;
 }
 

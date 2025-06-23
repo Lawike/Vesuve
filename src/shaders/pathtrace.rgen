@@ -34,53 +34,64 @@ void main()
 {
     vec3 hitValues = vec3(0);
 
-        // Initialize the random number generator
-        uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(clockARB()));
+    // Initialize the random number generator
+    uint seed = tea(gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x, int(clockARB()));
 
-        float r1 = rnd(seed);
-        float r2 = rnd(seed);
-        // Subpixel jitter: send the ray through a different position inside the pixel
-        // each time, to provide antialiasing.
-        vec2 subpixel_jitter = ubo.frameIndex == 0 ? vec2(0.5f, 0.5f) : vec2(r1, r2);
-        const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + subpixel_jitter;
-        const vec2 inUV = pixelCenter/vec2(gl_LaunchSizeEXT.xy);
-        vec2 d = inUV * 2.0 - 1.0;
+    float r1 = rnd(seed);
+    float r2 = rnd(seed);
+    // Subpixel jitter: send the ray through a different position inside the pixel
+    // each time, to provide antialiasing.
+    vec2 subpixel_jitter = ubo.frameIndex == 0 ? vec2(0.5f, 0.5f) : vec2(r1, r2);
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + subpixel_jitter;
+    const vec2 inUV = pixelCenter/vec2(gl_LaunchSizeEXT.xy);
+    vec2 d = inUV * 2.0 - 1.0;
 
-        vec4 origin    = ubo.invView * vec4(0, 0, 0, 1);
-        vec4 target    = ubo.invProj * vec4(d.x, d.y, 1.0, 1.0);
-        vec4 direction = ubo.invView * vec4(normalize(target.xyz), 0);
-        uint  rayFlags = gl_RayFlagsNoneEXT;
-        float tMin     = 0.001;
-        float tMax     = 100000.0;
+    vec4 origin    = ubo.invView * vec4(0, 0, 0, 1);
+    vec4 target    = ubo.invProj * vec4(d.x, d.y, 1.0, 1.0);
+    vec4 direction = ubo.invView * vec4(normalize(target.xyz), 0);
+    uint  rayFlags = gl_RayFlagsNoneEXT;
+    float tMin     = 0.001;
+    float tMax     = 100000.0;
 
-        prd.hitValue     = vec3(0);
-        prd.seed         = seed;
-        prd.depth        = 0;
-        prd.rayOrigin    = origin.xyz;
-        prd.rayDir = direction.xyz;
-        prd.weight       = vec3(0);
-        prd.attenuation = vec3(1.f, 1.f, 1.f);
+    prd.hitValue     = vec3(0);
+    prd.seed         = seed;
+    prd.depth        = 0;
+    prd.rayOrigin    = origin.xyz;
+    prd.rayDir       = direction.xyz;
+    prd.weight       = vec3(0);
+    prd.attenuation  = vec3(1.f, 1.f, 1.f);
 
-        vec3 attenuation = prd.attenuation;
+    vec3 attenuation = prd.attenuation;
 
-        vec3 curWeight = vec3(1);
-        for (; prd.depth < maxDepth; prd.depth++) {
-            traceRayEXT(topLevelAS, // acceleration structure
-              rayFlags,       // rayFlags
-              0xFF,           // cullMask
-              0,              // sbtRecordOffset
-              0,              // sbtRecordStride
-              0,              // missIndex
-              prd.rayOrigin,     // ray origin
-              tMin,           // ray min range
-              prd.rayDir,  // ray direction
-              tMax,           // ray max range
-              0               // payload (location = 0)
-            );
-            hitValues += prd.hitValue * curWeight * attenuation;
-            curWeight *= prd.weight;
-        }
+    vec3 curWeight = vec3(1);
+    for (; prd.depth < maxDepth; prd.depth++) {
+        traceRayEXT(topLevelAS, // acceleration structure
+            rayFlags,       // rayFlags
+            0xFF,           // cullMask
+            0,              // sbtRecordOffset
+            0,              // sbtRecordStride
+            0,              // missIndex
+            prd.rayOrigin,  // ray origin
+            tMin,           // ray min range
+            prd.rayDir,     // ray direction
+            tMax,           // ray max range
+            0               // payload (location = 0)
+        );
+        hitValues += prd.hitValue * curWeight * attenuation;
+        curWeight *= prd.weight;
+
+       if(prd.done == 1)
+          break;
+    }
+
+    // HDR tone mapping
+    hitValues = hitValues / (hitValues + vec3(1.0));
+
+    // Gamma correction
+    hitValues = pow(hitValues, vec3(1.0/2.2));
+
     prd.hitValue = hitValues;
+    
     // Do accumulation over time
     if(ubo.frameIndex > 0)
     {

@@ -1,6 +1,8 @@
 #version 450
 
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_KHR_vulkan_glsl : enable
+
 #include "input_structures.glsl"
 
 layout (location = 0) in vec3 inNormal;
@@ -46,7 +48,7 @@ void main()
 	specColor += S;
 	vec4 ambience = ambientCoefficient * ambientColor;
 	vec4 BlinnPhong = ambience + diffuseColor + specColor;
-	outFragColor = BlinnPhong;
+	outFragColor = vec4(abs(normal.x), abs(normal.y), abs(normal.z), 1);
 	// For debug
 	// outFragColor = vec4(inPos, 1);
 }

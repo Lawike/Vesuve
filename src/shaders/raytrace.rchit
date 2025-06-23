@@ -28,7 +28,7 @@ layout(set = 1, binding = 0) uniform SceneData
 	float shininess;
 	float screenGamma;
 	float aspectRatio;
-    uint frameIndex;
+	uint frameIndex;
 } sceneData;
 
 layout(set = 0, binding = 2, scalar) buffer GPUInstanceBuffers_ { GPUInstanceBuffers buffersAdresses[]; } instanceBuffers;

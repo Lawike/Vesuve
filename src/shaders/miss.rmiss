@@ -12,7 +12,7 @@ void main()
 	  prd.hitValue = vec3(1,1,1) * 0.8;
 	}
 	else {
-	  prd.hitValue = vec3(0.01);  // Tiny contribution from environment
+	  prd.hitValue = vec3(0.001);  // Tiny contribution from environment
 	}
 	// Ending trace
 	prd.done = 1;

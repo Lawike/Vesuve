@@ -65,25 +65,12 @@ void createCoordinateSystem(in vec3 N, out vec3 Nt, out vec3 Nb)
   Nb = cross(N, Nt);
 }
 
-struct PathToLight
-{
-    vec3 prev;
-    vec3 hit;
-    EmissiveTriangle next;
-};
-
-struct Sample
-{
-    PathToLight x;
-    float W;
-};
-
 struct Reservoir {
-    PathToLight sampleOut;
+    Sample sampleOut;
     float WSum;
 };
 
-void addSample(in PathToLight x,in float w, inout Reservoir r, inout uint seed) {
+void addSample(in Sample x,in float w, inout Reservoir r, inout uint seed) {
     r.WSum += w;
     if (rnd(seed) < w/r.WSum) {
         r.sampleOut = x;

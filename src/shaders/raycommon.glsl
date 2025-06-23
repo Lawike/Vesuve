@@ -12,6 +12,28 @@ struct hitPayload
   vec3 weight;
 };
 
+struct EmissiveTriangle
+{
+  vec4 x0;
+  vec4 x1;
+  vec4 x2;
+  vec4 normal;
+  vec4 emission;
+  float area;
+  float importance;  // area × luminance of emission
+  float extra[2]; // 16 bytes align
+};
+
+struct Sample
+{
+    vec3 origin;
+    vec3 hit;
+    EmissiveTriangle light;
+    vec3 lightPos;
+    vec3 bounceDir;
+    float weight;
+};
+
 struct Vertex {
 	vec3 position;
 	float uv_x;
@@ -40,16 +62,4 @@ struct GPUInstanceBuffers {
 	uint64_t materialBufferAddress;
 	uint64_t materialIndicesBufferAddress;
 	uint64_t emissiveTrianglesBufferAddress;
-};
-
-struct EmissiveTriangle
-{
-  vec4 x0;
-  vec4 x1;
-  vec4 x2;
-  vec4 normal;
-  vec4 emission;
-  float area;
-  float importance;  // area × luminance of emission
-  float extra[2]; // 16 bytes align
 };

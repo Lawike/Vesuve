@@ -22,7 +22,7 @@ It is highly WIP and mostly a way for me to learn computer graphics and the API.
   - [ ] Path Tracing
     - [ ] ReSTIR
       - [ ] Direct Lighting
-        - [ ] RIS
+        - [x] RIS
         - [ ] MIS
         - [ ] WRS
         - [ ] Spatial reuse

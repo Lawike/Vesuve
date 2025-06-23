@@ -15,6 +15,72 @@
 #include "stb_image.h"
 
 
+// Add this helper function to compute world transforms for all nodes
+void computeNodeWorldTransforms(const fastgltf::Asset& gltf, std::vector<glm::mat4>& worldTransforms)
+{
+  worldTransforms.resize(gltf.nodes.size());
+
+  // Find root nodes (nodes that aren't children of any other node)
+  std::vector<bool> isChild(gltf.nodes.size(), false);
+  for (size_t i = 0; i < gltf.nodes.size(); ++i)
+  {
+    const auto& node = gltf.nodes[i];
+    for (size_t childIndex : node.children)
+    {
+      if (childIndex < gltf.nodes.size())
+      {
+        isChild[childIndex] = true;
+      }
+    }
+  }
+
+  // Process root nodes recursively
+  std::function<void(size_t, const glm::mat4&)> processNode = [&](size_t nodeIndex, const glm::mat4& parentTransform)
+  {
+    if (nodeIndex >= gltf.nodes.size())
+      return;
+
+    const auto& node = gltf.nodes[nodeIndex];
+    glm::mat4 localTransform = glm::mat4(1.0f);
+
+    // Extract local transform from the node
+    std::visit(
+      fastgltf::visitor{
+        [&](const fastgltf::math::fmat4x4& matrix) { memcpy(&localTransform, matrix.data(), sizeof(matrix)); },
+        [&](const fastgltf::TRS& transform)
+        {
+          glm::vec3 translation(transform.translation[0], transform.translation[1], transform.translation[2]);
+          glm::quat rotation(transform.rotation[3], transform.rotation[0], transform.rotation[1], transform.rotation[2]);
+          glm::vec3 scale(transform.scale[0], transform.scale[1], transform.scale[2]);
+
+          glm::mat4 tm = glm::translate(glm::mat4(1.0f), translation);
+          glm::mat4 rm = glm::toMat4(rotation);
+          glm::mat4 sm = glm::scale(glm::mat4(1.0f), scale);
+
+          localTransform = tm * rm * sm;
+        }},
+      node.transform);
+
+    // Compute world transform
+    worldTransforms[nodeIndex] = parentTransform * localTransform;
+
+    // Process children
+    for (size_t childIndex : node.children)
+    {
+      processNode(childIndex, worldTransforms[nodeIndex]);
+    }
+  };
+
+  // Start processing from root nodes
+  for (size_t i = 0; i < gltf.nodes.size(); ++i)
+  {
+    if (!isChild[i])
+    {
+      processNode(i, glm::mat4(1.0f));
+    }
+  }
+}
+
 //--------------------------------------------------------------------------------------------------
 std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, std::string_view filePath)
 {
@@ -198,8 +264,24 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
   std::vector<uint32_t> indices;
   std::vector<Vertex> vertices;
 
-  for (fastgltf::Mesh& mesh : gltf.meshes)
+  // Add this before processing meshes
+  std::vector<glm::mat4> nodeWorldTransforms;
+  computeNodeWorldTransforms(gltf, nodeWorldTransforms);
+
+  // Create a mapping from mesh index to the nodes that use it
+  std::vector<std::vector<size_t>> meshToNodes(gltf.meshes.size());
+  for (size_t nodeIndex = 0; nodeIndex < gltf.nodes.size(); ++nodeIndex)
   {
+    const auto& node = gltf.nodes[nodeIndex];
+    if (node.meshIndex.has_value())
+    {
+      meshToNodes[*node.meshIndex].push_back(nodeIndex);
+    }
+  }
+
+  for (size_t meshIndex = 0; meshIndex < gltf.meshes.size(); ++meshIndex)
+  {
+    fastgltf::Mesh& mesh = gltf.meshes[meshIndex];
     std::shared_ptr<MeshAsset> newmesh = std::make_shared<MeshAsset>();
     meshes.push_back(newmesh);
     file.meshes[mesh.name.c_str()] = newmesh;
@@ -316,38 +398,43 @@ std::optional<std::shared_ptr<LoadedGLTF>> vkloader::loadGltf(VkEngine* engine, 
 
       if (isEmissive)
       {
-        for (uint32_t i = 0; i < newSurface.count; i += 3)
+        for (size_t nodeIndex : meshToNodes[meshIndex])
         {
-          uint32_t i0 = indices[newSurface.startIndex + i];
-          uint32_t i1 = indices[newSurface.startIndex + i + 1];
-          uint32_t i2 = indices[newSurface.startIndex + i + 2];
+          const glm::mat4& worldTransform = nodeWorldTransforms[nodeIndex];
+          const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(worldTransform)));
+          for (uint32_t i = 0; i < newSurface.count; i += 3)
+          {
+            uint32_t i0 = indices[newSurface.startIndex + i];
+            uint32_t i1 = indices[newSurface.startIndex + i + 1];
+            uint32_t i2 = indices[newSurface.startIndex + i + 2];
 
-          glm::vec3 v0 = vertices[i0].position;
-          glm::vec3 v1 = vertices[i1].position;
-          glm::vec3 v2 = vertices[i2].position;
+            glm::vec3 v0 = glm::vec3(worldTransform * glm::vec4(vertices[i0].position, 1.0));
+            glm::vec3 v1 = glm::vec3(worldTransform * glm::vec4(vertices[i1].position, 1.0));
+            glm::vec3 v2 = glm::vec3(worldTransform * glm::vec4(vertices[i2].position, 1.0));
 
-          glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
-          float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
+            glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+            float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
 
-          glm::vec3 emissionColor = {
-            sceneMaterialConstants[matIndex].emissiveFactors.x,
-            sceneMaterialConstants[matIndex].emissiveFactors.y,
-            sceneMaterialConstants[matIndex].emissiveFactors.z};
-          float strength = sceneMaterialConstants[matIndex].emissivePower;
+            glm::vec3 emissionColor = {
+              sceneMaterialConstants[matIndex].emissiveFactors.x,
+              sceneMaterialConstants[matIndex].emissiveFactors.y,
+              sceneMaterialConstants[matIndex].emissiveFactors.z};
+            float strength = sceneMaterialConstants[matIndex].emissivePower;
 
-          EmissiveTriangle tri;
-          tri.x0 = glm::vec4(v0, 1);
-          tri.x1 = glm::vec4(v1, 1);
-          tri.x2 = glm::vec4(v2, 1);
+            EmissiveTriangle tri;
+            tri.x0 = glm::vec4(v0, 1);
+            tri.x1 = glm::vec4(v1, 1);
+            tri.x2 = glm::vec4(v2, 1);
 
-          tri.normal = glm::vec4(normal.x, normal.y, normal.z, 1);
-          tri.emission = glm::vec4(emissionColor.x, emissionColor.y, emissionColor.z, 1) * strength;
-          tri.area = area;
-          tri.extra[0] = 0;
-          tri.extra[1] = 0;
-          // Laisse tri.cdf vide pour l'instant, on le calcule après
+            tri.normal = glm::vec4(normal.x, normal.y, normal.z, 1);
+            tri.emission = glm::vec4(emissionColor.x, emissionColor.y, emissionColor.z, 1) * strength;
+            tri.area = area;
+            tri.extra[0] = 0;
+            tri.extra[1] = 0;
+            // Laisse tri.cdf vide pour l'instant, on le calcule après
 
-          scene->emissiveTriangles.push_back(tri);  // <-- Ajoute à ta scène
+            scene->emissiveTriangles.push_back(tri);  // <-- Ajoute à ta scène
+          }
         }
       }
     }
